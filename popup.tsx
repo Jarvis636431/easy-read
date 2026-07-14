@@ -1,25 +1,206 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+
+import "./popup.css"
+
+import {
+  defaultSettings,
+  presets,
+  readSettings,
+  writeSettings,
+  type EasyReadSettings,
+  type ReadingMode
+} from "~lib/settings"
+
+const modes: Array<{
+  id: ReadingMode
+  name: string
+  note: string
+  swatch: string
+}> = [
+  { id: "native", name: "原生", note: "保持网页原貌", swatch: "#e8ecee" },
+  { id: "comfortable", name: "舒适", note: "柔和且宽松", swatch: "#d9d2bd" },
+  { id: "night", name: "夜间", note: "降低夜读刺激", swatch: "#17212a" },
+  { id: "immersive", name: "沉浸", note: "收窄并净化", swatch: "#7ba9ad" }
+]
 
 function IndexPopup() {
-  const [data, setData] = useState("")
+  const [settings, setSettings] = useState<EasyReadSettings>(defaultSettings)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    readSettings().then((value) => {
+      setSettings(value)
+      setReady(true)
+    })
+  }, [])
+
+  const update = (patch: Partial<EasyReadSettings>) => {
+    const next = { ...settings, ...patch }
+    setSettings(next)
+    void writeSettings(next)
+  }
+
+  const selectMode = (mode: ReadingMode) => {
+    const next = { ...presets[mode] }
+    setSettings(next)
+    void writeSettings(next)
+  }
 
   return (
-    <div
-      style={{
-        padding: 16
-      }}>
-      <h2>
-        Welcome to your{" "}
-        <a href="https://www.plasmo.com" target="_blank">
-          Plasmo
-        </a>{" "}
-        Extension!
-      </h2>
-      <input onChange={(e) => setData(e.target.value)} value={data} />
-      <a href="https://docs.plasmo.com" target="_blank">
-        View Docs
-      </a>
-    </div>
+    <main className="panel" aria-busy={!ready}>
+      <header className="masthead">
+        <div>
+          <p className="eyebrow">EASY READ</p>
+          <h1>阅读校准器</h1>
+        </div>
+        <label className="power">
+          <input
+            type="checkbox"
+            checked={settings.enabled}
+            onChange={(event) => update({ enabled: event.target.checked })}
+          />
+          <span aria-hidden="true" />
+          <b>{settings.enabled ? "已启用" : "已关闭"}</b>
+        </label>
+      </header>
+
+      <section className="section">
+        <div className="section-title">
+          <h2>阅读模式</h2>
+          <span>选择后仍可微调</span>
+        </div>
+        <div className="modes">
+          {modes.map((mode) => (
+            <button
+              className={settings.mode === mode.id ? "mode active" : "mode"}
+              key={mode.id}
+              onClick={() => selectMode(mode.id)}>
+              <i style={{ background: mode.swatch }} />
+              <strong>{mode.name}</strong>
+              <small>{mode.note}</small>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="section controls">
+        <div className="section-title">
+          <h2>排版</h2>
+          <span>应用到正文区域</span>
+        </div>
+        <Range
+          label="字号"
+          value={settings.fontSize}
+          min={14}
+          max={24}
+          suffix="px"
+          onChange={(fontSize) => update({ fontSize, enabled: true })}
+        />
+        <Range
+          label="行高"
+          value={settings.lineHeight}
+          min={1.4}
+          max={2.2}
+          step={0.05}
+          onChange={(lineHeight) => update({ lineHeight, enabled: true })}
+        />
+        <Range
+          label="宽度"
+          value={settings.contentWidth}
+          min={600}
+          max={1200}
+          step={20}
+          suffix="px"
+          onChange={(contentWidth) => update({ contentWidth, enabled: true })}
+        />
+      </section>
+
+      <section className="section cleanup">
+        <div className="section-title">
+          <h2>页面净化</h2>
+          <span>基于常见网页结构</span>
+        </div>
+        <Toggle
+          label="隐藏广告"
+          note="移除常见广告和赞助区域"
+          checked={settings.hideAds}
+          onChange={(hideAds) => update({ hideAds })}
+        />
+        <Toggle
+          label="隐藏侧栏"
+          note="收起辅助栏与推荐区域"
+          checked={settings.hideSidebars}
+          onChange={(hideSidebars) => update({ hideSidebars })}
+        />
+      </section>
+
+      <footer>设置自动保存并应用到所有普通网页</footer>
+    </main>
+  )
+}
+
+function Range({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  suffix = "",
+  onChange
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  suffix?: string
+  onChange: (value: number) => void
+}) {
+  const progress = ((value - min) / (max - min)) * 100
+  return (
+    <label className="range-row">
+      <span>{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        style={{ "--progress": `${progress}%` } as React.CSSProperties}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <output>
+        {value}
+        {suffix}
+      </output>
+    </label>
+  )
+}
+
+function Toggle({
+  label,
+  note,
+  checked,
+  onChange
+}: {
+  label: string
+  note: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="toggle-row">
+      <span>
+        <strong>{label}</strong>
+        <small>{note}</small>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <i aria-hidden="true" />
+    </label>
   )
 }
 
