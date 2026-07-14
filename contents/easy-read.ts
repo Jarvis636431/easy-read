@@ -1,6 +1,13 @@
 import type { PlasmoCSConfig } from "plasmo"
 
-import { readSettings, STORAGE_KEY, type EasyReadSettings } from "~lib/settings"
+import {
+  readRules,
+  readSettings,
+  resolveSettings,
+  RULES_STORAGE_KEY,
+  STORAGE_KEY,
+  type EasyReadSettings
+} from "~lib/settings"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -77,10 +84,18 @@ function applySettings(settings: EasyReadSettings) {
   ;(document.head ?? document.documentElement).appendChild(style)
 }
 
-readSettings().then(applySettings)
+async function refreshSettings() {
+  const [settings, rules] = await Promise.all([readSettings(), readRules()])
+  applySettings(resolveSettings(location.href, settings, rules))
+}
+
+void refreshSettings()
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "local" && changes[STORAGE_KEY]?.newValue) {
-    applySettings(changes[STORAGE_KEY].newValue)
+  if (
+    areaName === "local" &&
+    (changes[STORAGE_KEY] || changes[RULES_STORAGE_KEY])
+  ) {
+    void refreshSettings()
   }
 })

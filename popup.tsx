@@ -134,7 +134,12 @@ function IndexPopup() {
         />
       </section>
 
-      <footer>设置自动保存并应用到所有普通网页</footer>
+      <footer>
+        <span>设置自动保存并应用到所有普通网页</span>
+        <button onClick={() => void chrome.runtime.openOptionsPage()}>
+          URL 规则 →
+        </button>
+      </footer>
     </main>
   )
 }
