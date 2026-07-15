@@ -4,11 +4,15 @@ import "./popup.css"
 
 import {
   defaultSettings,
+  findMatchingRule,
   presets,
+  readRules,
   readSettings,
+  readThemes,
   writeSettings,
   type EasyReadSettings,
-  type ReadingMode
+  type ReadingMode,
+  type ReadingTheme
 } from "~lib/settings"
 
 const modes: Array<{
@@ -25,11 +29,38 @@ const modes: Array<{
 
 function IndexPopup() {
   const [settings, setSettings] = useState<EasyReadSettings>(defaultSettings)
+  const [site, setSite] = useState<{
+    hostname: string
+    supported: boolean
+    ruleName?: string
+    theme?: ReadingTheme
+  } | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    readSettings().then((value) => {
+    Promise.all([
+      readSettings(),
+      readRules(),
+      readThemes(),
+      chrome.tabs.query({ active: true, currentWindow: true })
+    ]).then(([value, rules, themes, tabs]) => {
       setSettings(value)
+
+      const url = tabs[0]?.url
+      if (!url || !/^https?:\/\//i.test(url)) {
+        setSite({ hostname: "浏览器内部页面", supported: false })
+      } else {
+        const hostname = new URL(url).hostname
+        const rule = findMatchingRule(url, rules)
+        setSite({
+          hostname,
+          supported: true,
+          ruleName: rule?.name,
+          theme: rule
+            ? themes.find((theme) => theme.id === rule.themeId)
+            : undefined
+        })
+      }
       setReady(true)
     })
   }, [])
@@ -63,6 +94,39 @@ function IndexPopup() {
           <b>{settings.enabled ? "已启用" : "已关闭"}</b>
         </label>
       </header>
+
+      <section className="site-card" aria-label="当前网站状态">
+        <div className="site-mark" aria-hidden="true">
+          {site?.supported ? "◎" : "—"}
+        </div>
+        <div className="site-copy">
+          <span>当前网站</span>
+          <strong title={site?.hostname}>
+            {site?.hostname ?? "正在识别…"}
+          </strong>
+          <small>
+            {!site
+              ? "正在检查 URL 规则"
+              : !site.supported
+                ? "此页面不允许扩展修改"
+                : site.ruleName
+                  ? `命中规则：${site.ruleName}`
+                  : "未命中规则，使用全局设置"}
+          </small>
+        </div>
+        <div className={site?.ruleName ? "site-source matched" : "site-source"}>
+          {site?.theme && (
+            <i
+              style={{
+                background: `linear-gradient(135deg, ${site.theme.settings.pageColor} 50%, ${site.theme.settings.contentColor} 50%)`
+              }}
+            />
+          )}
+          <span>
+            {site?.theme?.name ?? (site?.supported ? "全局" : "不可用")}
+          </span>
+        </div>
+      </section>
 
       <section className="section">
         <div className="section-title">

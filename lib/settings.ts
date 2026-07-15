@@ -163,9 +163,13 @@ export function resolveSettings(
   rules: UrlRule[],
   themes: ReadingTheme[]
 ) {
-  const rule = rules.find(
-    (candidate) => candidate.enabled && matchesUrl(candidate.pattern, url)
-  )
+  const rule = findMatchingRule(url, rules)
   if (!rule) return fallback
   return themes.find((theme) => theme.id === rule.themeId)?.settings ?? fallback
+}
+
+export function findMatchingRule(url: string, rules: UrlRule[]) {
+  return rules.find(
+    (candidate) => candidate.enabled && matchesUrl(candidate.pattern, url)
+  )
 }
