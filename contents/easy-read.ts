@@ -24,6 +24,8 @@ function themeStyles(settings: EasyReadSettings) {
     html.${ROOT_CLASS}, html.${ROOT_CLASS} body { background: ${settings.pageColor} !important; color: ${settings.textColor} !important; }
     html.${ROOT_CLASS} :is(main, article, [role="main"]) { background: ${settings.contentColor} !important; color: ${settings.textColor} !important; }
     html.${ROOT_CLASS} :is(main, article, [role="main"]) :is(p, li, blockquote, h1, h2, h3, h4, h5, h6, span):not([class*="icon"]) { color: inherit; }
+    html.${ROOT_CLASS} :is(main, article, [role="main"]) :is(p, li, blockquote) { font-family: ${settings.fontFamily} !important; }
+    html.${ROOT_CLASS} :is(main, article, [role="main"]) :is(h1, h2, h3, h4, h5, h6) { font-family: ${settings.headingFontFamily} !important; }
     html.${ROOT_CLASS} a { color: ${settings.linkColor} !important; }
     html.${ROOT_CLASS} img { filter: brightness(${settings.imageBrightness}); }
   `

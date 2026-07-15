@@ -13,6 +13,8 @@ export type EasyReadSettings = {
   textColor: string
   linkColor: string
   imageBrightness: number
+  fontFamily: string
+  headingFontFamily: string
 }
 
 export const STORAGE_KEY = "easyReadSettings"
@@ -47,7 +49,9 @@ export const presets: Record<ReadingMode, EasyReadSettings> = {
     contentColor: "#ffffff",
     textColor: "#202a30",
     linkColor: "#176b78",
-    imageBrightness: 1
+    imageBrightness: 1,
+    fontFamily: '"Helvetica Neue", Arial, "PingFang SC", sans-serif',
+    headingFontFamily: 'Georgia, "Songti SC", serif'
   },
   comfortable: {
     enabled: true,
@@ -61,7 +65,9 @@ export const presets: Record<ReadingMode, EasyReadSettings> = {
     contentColor: "#fbfaf5",
     textColor: "#2b3437",
     linkColor: "#176b78",
-    imageBrightness: 1
+    imageBrightness: 1,
+    fontFamily: '"Helvetica Neue", Arial, "PingFang SC", sans-serif',
+    headingFontFamily: 'Georgia, "Songti SC", serif'
   },
   night: {
     enabled: true,
@@ -75,7 +81,9 @@ export const presets: Record<ReadingMode, EasyReadSettings> = {
     contentColor: "#17212a",
     textColor: "#dce4e8",
     linkColor: "#8fc9e8",
-    imageBrightness: 0.82
+    imageBrightness: 0.82,
+    fontFamily: '"Helvetica Neue", Arial, "PingFang SC", sans-serif',
+    headingFontFamily: 'Georgia, "Songti SC", serif'
   },
   immersive: {
     enabled: true,
@@ -89,23 +97,47 @@ export const presets: Record<ReadingMode, EasyReadSettings> = {
     contentColor: "#ffffff",
     textColor: "#202a30",
     linkColor: "#176b78",
-    imageBrightness: 1
+    imageBrightness: 1,
+    fontFamily: '"Helvetica Neue", Arial, "PingFang SC", sans-serif',
+    headingFontFamily: 'Georgia, "Songti SC", serif'
   }
 }
 
-export const builtinThemes: ReadingTheme[] = (
-  Object.keys(presets) as ReadingMode[]
-).map((id) => ({
-  id,
-  name: {
-    native: "原生",
-    comfortable: "舒适",
-    night: "夜间",
-    immersive: "沉浸"
-  }[id],
-  builtin: true,
-  settings: presets[id]
-}))
+export const builtinThemes: ReadingTheme[] = [
+  ...(Object.keys(presets) as ReadingMode[]).map((id) => ({
+    id,
+    name: {
+      native: "原生",
+      comfortable: "舒适",
+      night: "夜间",
+      immersive: "沉浸"
+    }[id],
+    builtin: true,
+    settings: presets[id]
+  })),
+  {
+    id: "claude",
+    name: "Claude 暖纸",
+    builtin: true,
+    settings: {
+      enabled: true,
+      mode: "comfortable",
+      fontSize: 18,
+      lineHeight: 1.7,
+      contentWidth: 820,
+      hideAds: true,
+      hideSidebars: false,
+      pageColor: "#F5F4ED",
+      contentColor: "#FAF9F5",
+      textColor: "#141413",
+      linkColor: "#D97757",
+      imageBrightness: 0.96,
+      fontFamily:
+        '"Anthropic Sans", "Helvetica Neue", Arial, "PingFang SC", sans-serif',
+      headingFontFamily: '"Anthropic Serif", Georgia, "Songti SC", serif'
+    }
+  }
+]
 
 export const defaultSettings = presets.native
 

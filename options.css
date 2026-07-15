@@ -249,6 +249,28 @@ button {
 .parameter-grid {
   margin-top: 13px;
 }
+.font-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 13px;
+}
+.font-grid label {
+  display: grid;
+  gap: 6px;
+}
+.font-grid input {
+  height: 36px;
+  padding: 0 10px;
+  color: #284348;
+  font:
+    10px/1.2 "SFMono-Regular",
+    Consolas,
+    monospace;
+  border: 1px solid #ccd7d5;
+  border-radius: 3px;
+  background: white;
+}
 .theme-switches {
   display: flex;
   gap: 22px;
@@ -632,6 +654,9 @@ button:focus-visible {
   .color-grid,
   .parameter-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .font-grid {
+    grid-template-columns: 1fr;
   }
   .rule-binding {
     grid-template-columns: 1fr;

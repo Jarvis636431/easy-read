@@ -276,6 +276,20 @@ function OptionsPage() {
                     }
                   />
                 </div>
+                <div className="font-grid">
+                  <TextField
+                    label="正文字体栈"
+                    value={selected.settings.fontFamily}
+                    onChange={(fontFamily) => updateTheme({ fontFamily })}
+                  />
+                  <TextField
+                    label="标题字体栈"
+                    value={selected.settings.headingFontFamily}
+                    onChange={(headingFontFamily) =>
+                      updateTheme({ headingFontFamily })
+                    }
+                  />
+                </div>
                 <div className="theme-switches">
                   <CheckField
                     label="默认隐藏广告"
@@ -503,6 +517,23 @@ function CheckField({
         onChange={(event) => onChange(event.target.checked)}
       />{" "}
       {label}
+    </label>
+  )
+}
+
+function TextField({
+  label,
+  value,
+  onChange
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <input value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   )
 }
