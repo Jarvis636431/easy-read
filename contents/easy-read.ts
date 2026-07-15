@@ -3,9 +3,11 @@ import type { PlasmoCSConfig } from "plasmo"
 import {
   readRules,
   readSettings,
+  readThemes,
   resolveSettings,
   RULES_STORAGE_KEY,
   STORAGE_KEY,
+  THEMES_STORAGE_KEY,
   type EasyReadSettings
 } from "~lib/settings"
 
@@ -18,29 +20,12 @@ const STYLE_ID = "easy-read-page-styles"
 const ROOT_CLASS = "easy-read-active"
 
 function themeStyles(settings: EasyReadSettings) {
-  if (settings.mode === "night") {
-    return `
-      html.${ROOT_CLASS}, html.${ROOT_CLASS} body { background: #111820 !important; color: #dce4e8 !important; color-scheme: dark !important; }
-      html.${ROOT_CLASS} :is(main, article, [role="main"]) { background: #17212a !important; color: #dce4e8 !important; }
-      html.${ROOT_CLASS} :is(p, li, blockquote, h1, h2, h3, h4, h5, h6, span):not([class*="icon"]) { color: inherit; }
-      html.${ROOT_CLASS} a { color: #8fc9e8 !important; }
-      html.${ROOT_CLASS} img { filter: brightness(.82) contrast(.96); }
-    `
-  }
-
-  if (settings.mode === "comfortable") {
-    return `
-      html.${ROOT_CLASS}, html.${ROOT_CLASS} body { background: #f3f0e7 !important; color: #2b3437 !important; }
-      html.${ROOT_CLASS} :is(main, article, [role="main"]) { background: #fbfaf5 !important; color: #2b3437 !important; }
-      html.${ROOT_CLASS} a { color: #176b78 !important; }
-    `
-  }
-
   return `
-    html.${ROOT_CLASS}, html.${ROOT_CLASS} body { background: #eef1f2 !important; color: #202a30 !important; }
-    html.${ROOT_CLASS} :is(main, article, [role="main"]) { background: #ffffff !important; color: #202a30 !important; }
-    html.${ROOT_CLASS} :is(header, footer) { opacity: .38 !important; transition: opacity .2s ease !important; }
-    html.${ROOT_CLASS} :is(header, footer):hover { opacity: 1 !important; }
+    html.${ROOT_CLASS}, html.${ROOT_CLASS} body { background: ${settings.pageColor} !important; color: ${settings.textColor} !important; }
+    html.${ROOT_CLASS} :is(main, article, [role="main"]) { background: ${settings.contentColor} !important; color: ${settings.textColor} !important; }
+    html.${ROOT_CLASS} :is(main, article, [role="main"]) :is(p, li, blockquote, h1, h2, h3, h4, h5, h6, span):not([class*="icon"]) { color: inherit; }
+    html.${ROOT_CLASS} a { color: ${settings.linkColor} !important; }
+    html.${ROOT_CLASS} img { filter: brightness(${settings.imageBrightness}); }
   `
 }
 
@@ -85,8 +70,12 @@ function applySettings(settings: EasyReadSettings) {
 }
 
 async function refreshSettings() {
-  const [settings, rules] = await Promise.all([readSettings(), readRules()])
-  applySettings(resolveSettings(location.href, settings, rules))
+  const [settings, rules, themes] = await Promise.all([
+    readSettings(),
+    readRules(),
+    readThemes()
+  ])
+  applySettings(resolveSettings(location.href, settings, rules, themes))
 }
 
 void refreshSettings()
@@ -94,7 +83,9 @@ void refreshSettings()
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (
     areaName === "local" &&
-    (changes[STORAGE_KEY] || changes[RULES_STORAGE_KEY])
+    (changes[STORAGE_KEY] ||
+      changes[RULES_STORAGE_KEY] ||
+      changes[THEMES_STORAGE_KEY])
   ) {
     void refreshSettings()
   }
