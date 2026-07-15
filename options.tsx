@@ -5,10 +5,12 @@ import "./options.css"
 import {
   builtinThemes,
   readNetworkBlocking,
+  readQuickThemeIds,
   readRules,
   readThemes,
   writeCustomThemes,
   writeNetworkBlocking,
+  writeQuickThemeIds,
   writeRules,
   type EasyReadSettings,
   type ReadingTheme,
@@ -41,13 +43,20 @@ function OptionsPage() {
   const [selectedId, setSelectedId] = useState("comfortable")
   const [saved, setSaved] = useState(false)
   const [networkBlocking, setNetworkBlocking] = useState(true)
+  const [quickThemeIds, setQuickThemeIds] = useState<string[]>([])
 
   useEffect(() => {
-    Promise.all([readThemes(), readRules(), readNetworkBlocking()]).then(
-      ([storedThemes, storedRules, storedNetworkBlocking]) => {
+    Promise.all([
+      readThemes(),
+      readRules(),
+      readNetworkBlocking(),
+      readQuickThemeIds()
+    ]).then(
+      ([storedThemes, storedRules, storedNetworkBlocking, storedQuickIds]) => {
         setThemes(storedThemes)
         setRules(storedRules)
         setNetworkBlocking(storedNetworkBlocking)
+        setQuickThemeIds(storedQuickIds)
       }
     )
   }, [])
@@ -70,6 +79,13 @@ function OptionsPage() {
   const persistRules = (next: UrlRule[]) => {
     setRules(next)
     void writeRules(next).then(showSaved)
+  }
+
+  const updateQuickTheme = (index: number, themeId: string) => {
+    const next = [...quickThemeIds]
+    next[index] = themeId
+    setQuickThemeIds(next)
+    void writeQuickThemeIds(next).then(showSaved)
   }
 
   const addTheme = (source = selected) => {
@@ -108,6 +124,11 @@ function OptionsPage() {
       )
     )
     persistThemes(themes.filter((theme) => theme.id !== selected.id))
+    const nextQuickIds = quickThemeIds.map((id) =>
+      id === selected.id ? "comfortable" : id
+    )
+    setQuickThemeIds(nextQuickIds)
+    void writeQuickThemeIds(nextQuickIds)
     setSelectedId("comfortable")
   }
 
@@ -310,6 +331,46 @@ function OptionsPage() {
               </fieldset>
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="workspace-section shortcuts-section">
+        <div className="section-heading">
+          <div>
+            <span>POPUP SHORTCUTS</span>
+            <h2>快捷主题</h2>
+          </div>
+          <p>设置 Popup 中从左到右显示的四个主题。</p>
+        </div>
+        <div className="shortcut-grid">
+          {quickThemeIds.map((themeId, index) => {
+            const theme =
+              themes.find((item) => item.id === themeId) ?? themes[0]
+            return (
+              <label className="shortcut-slot" key={index}>
+                <b>{String(index + 1).padStart(2, "0")}</b>
+                {theme && (
+                  <i
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.settings.pageColor} 50%, ${theme.settings.contentColor} 50%)`
+                    }}
+                  />
+                )}
+                <span>快捷位置 {index + 1}</span>
+                <select
+                  value={theme?.id ?? "native"}
+                  onChange={(event) =>
+                    updateQuickTheme(index, event.target.value)
+                  }>
+                  {themes.map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
+          })}
         </div>
       </section>
 

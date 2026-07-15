@@ -3,32 +3,25 @@ import { useEffect, useState } from "react"
 import "./popup.css"
 
 import {
+  defaultQuickThemeIds,
   defaultSettings,
   findMatchingRule,
-  presets,
+  readActiveThemeId,
+  readQuickThemeIds,
   readRules,
   readSettings,
   readThemes,
+  writeActiveThemeId,
   writeSettings,
   type EasyReadSettings,
-  type ReadingMode,
   type ReadingTheme
 } from "~lib/settings"
 
-const modes: Array<{
-  id: ReadingMode
-  name: string
-  note: string
-  swatch: string
-}> = [
-  { id: "native", name: "原生", note: "保持网页原貌", swatch: "#e8ecee" },
-  { id: "comfortable", name: "舒适", note: "柔和且宽松", swatch: "#d9d2bd" },
-  { id: "night", name: "夜间", note: "降低夜读刺激", swatch: "#17212a" },
-  { id: "immersive", name: "沉浸", note: "收窄并净化", swatch: "#7ba9ad" }
-]
-
 function IndexPopup() {
   const [settings, setSettings] = useState<EasyReadSettings>(defaultSettings)
+  const [themes, setThemes] = useState<ReadingTheme[]>([])
+  const [quickThemeIds, setQuickThemeIds] = useState<string[]>([])
+  const [activeThemeId, setActiveThemeId] = useState("native")
   const [site, setSite] = useState<{
     hostname: string
     supported: boolean
@@ -42,9 +35,14 @@ function IndexPopup() {
       readSettings(),
       readRules(),
       readThemes(),
+      readQuickThemeIds(),
+      readActiveThemeId(),
       chrome.tabs.query({ active: true, currentWindow: true })
-    ]).then(([value, rules, themes, tabs]) => {
+    ]).then(([value, rules, storedThemes, storedQuickIds, activeId, tabs]) => {
       setSettings(value)
+      setThemes(storedThemes)
+      setQuickThemeIds(storedQuickIds)
+      setActiveThemeId(activeId)
 
       const url = tabs[0]?.url
       if (!url || !/^https?:\/\//i.test(url)) {
@@ -57,7 +55,7 @@ function IndexPopup() {
           supported: true,
           ruleName: rule?.name,
           theme: rule
-            ? themes.find((theme) => theme.id === rule.themeId)
+            ? storedThemes.find((theme) => theme.id === rule.themeId)
             : undefined
         })
       }
@@ -71,11 +69,21 @@ function IndexPopup() {
     void writeSettings(next)
   }
 
-  const selectMode = (mode: ReadingMode) => {
-    const next = { ...presets[mode] }
+  const selectTheme = (theme: ReadingTheme) => {
+    const next = { ...theme.settings }
     setSettings(next)
-    void writeSettings(next)
+    setActiveThemeId(theme.id)
+    void Promise.all([writeSettings(next), writeActiveThemeId(theme.id)])
   }
+
+  const quickThemes = quickThemeIds
+    .map(
+      (id, index) =>
+        themes.find((theme) => theme.id === id) ??
+        themes.find((theme) => theme.id === defaultQuickThemeIds[index]) ??
+        themes[0]
+    )
+    .filter((theme): theme is ReadingTheme => Boolean(theme))
 
   return (
     <main className="panel" aria-busy={!ready}>
@@ -130,18 +138,22 @@ function IndexPopup() {
 
       <section className="section">
         <div className="section-title">
-          <h2>阅读模式</h2>
-          <span>选择后仍可微调</span>
+          <h2>快捷主题</h2>
+          <span>可在设置页更换</span>
         </div>
         <div className="modes">
-          {modes.map((mode) => (
+          {quickThemes.map((theme, index) => (
             <button
-              className={settings.mode === mode.id ? "mode active" : "mode"}
-              key={mode.id}
-              onClick={() => selectMode(mode.id)}>
-              <i style={{ background: mode.swatch }} />
-              <strong>{mode.name}</strong>
-              <small>{mode.note}</small>
+              className={activeThemeId === theme.id ? "mode active" : "mode"}
+              key={`${index}-${theme.id}`}
+              onClick={() => selectTheme(theme)}>
+              <i
+                style={{
+                  background: `linear-gradient(135deg, ${theme.settings.pageColor} 50%, ${theme.settings.contentColor} 50%)`
+                }}
+              />
+              <strong title={theme.name}>{theme.name}</strong>
+              <small>{theme.builtin ? "内置" : "自定义"}</small>
             </button>
           ))}
         </div>

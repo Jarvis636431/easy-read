@@ -286,6 +286,59 @@ button {
   padding-top: 31px;
   border-top: 1px solid #becac9;
 }
+.shortcuts-section {
+  margin-top: 42px;
+  padding-top: 30px;
+  border-top: 1px solid #becac9;
+}
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.shortcut-slot {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  gap: 5px 10px;
+  padding: 13px;
+  border: 1px solid #c9d5d3;
+  border-radius: 4px;
+  background: #f8faf8;
+}
+.shortcut-slot > b {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  color: #90a09f;
+  font:
+    700 9px/1 "SFMono-Regular",
+    Consolas,
+    monospace;
+}
+.shortcut-slot > i {
+  grid-row: span 2;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #18303920;
+  border-radius: 3px;
+}
+.shortcut-slot > span {
+  color: #718184;
+  font-size: 9px;
+  font-weight: 700;
+}
+.shortcut-slot select {
+  min-width: 0;
+  height: 30px;
+  padding: 0 7px;
+  color: #29474c;
+  font-size: 11px;
+  border: 1px solid #ccd7d5;
+  border-radius: 3px;
+  background: white;
+}
 .network-blocking-card {
   display: grid;
   grid-template-columns: 38px 1fr auto auto;
@@ -750,6 +803,9 @@ button:focus-visible {
   }
   .font-grid {
     grid-template-columns: 1fr;
+  }
+  .shortcut-grid {
+    grid-template-columns: 1fr 1fr;
   }
   .rule-binding {
     grid-template-columns: 1fr;

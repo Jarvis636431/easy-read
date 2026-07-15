@@ -22,6 +22,14 @@ export const RULES_STORAGE_KEY = "easyReadUrlRules"
 export const THEMES_STORAGE_KEY = "easyReadCustomThemes"
 export const NETWORK_BLOCKING_STORAGE_KEY = "easyReadNetworkAdBlocking"
 export const AD_RULESET_ID = "easy_read_ads"
+export const QUICK_THEMES_STORAGE_KEY = "easyReadQuickThemeIds"
+export const ACTIVE_THEME_STORAGE_KEY = "easyReadActiveThemeId"
+export const defaultQuickThemeIds = [
+  "native",
+  "comfortable",
+  "night",
+  "immersive"
+]
 
 export type ReadingTheme = {
   id: string
@@ -208,6 +216,29 @@ export async function readNetworkBlocking(): Promise<boolean> {
 
 export async function writeNetworkBlocking(enabled: boolean) {
   await chrome.storage.local.set({ [NETWORK_BLOCKING_STORAGE_KEY]: enabled })
+}
+
+export async function readQuickThemeIds(): Promise<string[]> {
+  const result = await chrome.storage.local.get(QUICK_THEMES_STORAGE_KEY)
+  const stored = result[QUICK_THEMES_STORAGE_KEY]
+  return Array.isArray(stored) && stored.length === 4
+    ? stored
+    : defaultQuickThemeIds
+}
+
+export async function writeQuickThemeIds(themeIds: string[]) {
+  await chrome.storage.local.set({
+    [QUICK_THEMES_STORAGE_KEY]: themeIds.slice(0, 4)
+  })
+}
+
+export async function readActiveThemeId(): Promise<string> {
+  const result = await chrome.storage.local.get(ACTIVE_THEME_STORAGE_KEY)
+  return result[ACTIVE_THEME_STORAGE_KEY] ?? "native"
+}
+
+export async function writeActiveThemeId(themeId: string) {
+  await chrome.storage.local.set({ [ACTIVE_THEME_STORAGE_KEY]: themeId })
 }
 
 export function matchesUrl(pattern: string, url: string) {
