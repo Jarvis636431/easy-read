@@ -34,6 +34,7 @@ export type UrlRule = {
   pattern: string
   enabled: boolean
   themeId: string
+  customHideSelectors: string
 }
 
 export const presets: Record<ReadingMode, EasyReadSettings> = {

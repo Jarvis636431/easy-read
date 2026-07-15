@@ -28,7 +28,8 @@ function createRule(themeId: string): UrlRule {
     name: "新网站规则",
     pattern: "*.example.com/*",
     enabled: true,
-    themeId
+    themeId,
+    customHideSelectors: ""
   }
 }
 
@@ -416,6 +417,21 @@ function OptionsPage() {
                       </select>
                     </label>
                   </div>
+                  <label className="custom-selectors">
+                    <span>自定义隐藏选择器</span>
+                    <textarea
+                      value={rule.customHideSelectors ?? ""}
+                      placeholder={
+                        "每行一个 CSS 选择器，例如：\n.promotion-banner\n#sticky-ad"
+                      }
+                      onChange={(event) =>
+                        updateRule(rule.id, {
+                          customHideSelectors: event.target.value
+                        })
+                      }
+                    />
+                    <small>仅在该规则主题开启“隐藏广告”时生效。</small>
+                  </label>
                   <div className="rule-footer">
                     <span>主题参数由主题库统一管理</span>
                     <button

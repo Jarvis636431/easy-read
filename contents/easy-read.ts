@@ -1,6 +1,7 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import {
+  findMatchingRule,
   readRules,
   readSettings,
   readThemes,
@@ -19,6 +20,35 @@ export const config: PlasmoCSConfig = {
 const STYLE_ID = "easy-read-page-styles"
 const ROOT_CLASS = "easy-read-active"
 
+const AD_SELECTORS = [
+  "ins.adsbygoogle",
+  "[data-ad]",
+  "[data-ad-slot]",
+  "[data-ad-unit]",
+  "[data-ad-container]",
+  '[data-testid="ad"]',
+  '[data-testid^="ad-"]',
+  '[data-testid*="advert"]',
+  '[aria-label="Advertisement" i]',
+  '[aria-label="Sponsored" i]',
+  '[id^="google_ads_"]',
+  '[id^="div-gpt-ad"]',
+  '[id^="ad-container"]',
+  '[id$="-ad-container"]',
+  '[class~="ad"]',
+  '[class~="ads"]',
+  '[class~="advert"]',
+  '[class*="ad-container" i]',
+  '[class*="ad-wrapper" i]',
+  '[class*="advertisement" i]',
+  '[class*="sponsored-content" i]',
+  '[class*="sponsor-block" i]',
+  'iframe[src*="doubleclick.net"]',
+  'iframe[src*="googlesyndication.com"]',
+  'iframe[src*="googleadservices.com"]',
+  'iframe[title*="advertisement" i]'
+]
+
 function themeStyles(settings: EasyReadSettings) {
   return `
     html.${ROOT_CLASS}, html.${ROOT_CLASS} body { background: ${settings.pageColor} !important; color: ${settings.textColor} !important; }
@@ -31,10 +61,14 @@ function themeStyles(settings: EasyReadSettings) {
   `
 }
 
-function buildStyles(settings: EasyReadSettings) {
+function buildStyles(
+  settings: EasyReadSettings,
+  customHideSelectors: string[] = []
+) {
+  const adSelectors = [...AD_SELECTORS, ...customHideSelectors].join(",\n")
   const cleanup = [
     settings.hideAds &&
-      `html.${ROOT_CLASS} :is([id*="advert" i], [class*="advert" i], [id*="sponsor" i], [class*="sponsor" i], [aria-label*="advert" i], iframe[src*="ad" i]) { display: none !important; }`,
+      `html.${ROOT_CLASS} :is(${adSelectors}) { display: none !important; visibility: hidden !important; }`,
     settings.hideSidebars &&
       `html.${ROOT_CLASS} :is(aside, [role="complementary"], [class*="sidebar" i], [id*="sidebar" i]) { display: none !important; }`
   ]
@@ -59,7 +93,10 @@ function buildStyles(settings: EasyReadSettings) {
   `
 }
 
-function applySettings(settings: EasyReadSettings) {
+function applySettings(
+  settings: EasyReadSettings,
+  customHideSelectors: string[] = []
+) {
   document.documentElement.classList.toggle(ROOT_CLASS, settings.enabled)
   document.getElementById(STYLE_ID)?.remove()
 
@@ -67,7 +104,7 @@ function applySettings(settings: EasyReadSettings) {
 
   const style = document.createElement("style")
   style.id = STYLE_ID
-  style.textContent = buildStyles(settings)
+  style.textContent = buildStyles(settings, customHideSelectors)
   ;(document.head ?? document.documentElement).appendChild(style)
 }
 
@@ -77,7 +114,26 @@ async function refreshSettings() {
     readRules(),
     readThemes()
   ])
-  applySettings(resolveSettings(location.href, settings, rules, themes))
+  const rule = findMatchingRule(location.href, rules)
+  applySettings(
+    resolveSettings(location.href, settings, rules, themes),
+    parseCustomSelectors(rule?.customHideSelectors)
+  )
+}
+
+function parseCustomSelectors(value = "") {
+  return value
+    .split("\n")
+    .map((selector) => selector.trim())
+    .filter((selector) => {
+      if (!selector || /[{};]/.test(selector)) return false
+      try {
+        document.querySelector(selector)
+        return true
+      } catch {
+        return false
+      }
+    })
 }
 
 void refreshSettings()
