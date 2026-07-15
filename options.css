@@ -638,6 +638,106 @@ button:disabled {
   color: #849092;
   font-size: 9px;
 }
+.layout-rule-editor {
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid #ccd7d5;
+  border-radius: 4px;
+  background: #f5f8f6;
+}
+.layout-rule-editor summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 13px;
+  color: #324d52;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.layout-rule-editor summary::-webkit-details-marker {
+  display: none;
+}
+.layout-rule-editor summary::before {
+  content: "+";
+  margin-right: 8px;
+  color: #568087;
+}
+.layout-rule-editor[open] summary::before {
+  content: "−";
+}
+.layout-rule-editor summary > span {
+  margin-right: auto;
+}
+.layout-rule-editor summary b {
+  padding: 4px 7px;
+  font-size: 9px;
+  border-radius: 2px;
+}
+.layout-ready {
+  color: #24666d;
+  background: #dfecea;
+}
+.layout-empty {
+  color: #7a898a;
+  background: #e8edeb;
+}
+.layout-editor-body {
+  padding: 13px;
+  border-top: 1px solid #d8e1df;
+  background: #fbfcfa;
+}
+.layout-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 10px;
+}
+.layout-meta-grid label,
+.region-selector-grid label {
+  display: grid;
+  gap: 5px;
+}
+.layout-meta-grid span,
+.region-selector-grid span {
+  color: #718184;
+  font-size: 9px;
+  font-weight: 700;
+}
+.layout-meta-grid select,
+.layout-meta-grid button {
+  height: 34px;
+  padding: 0 9px;
+  color: #29474c;
+  font-size: 10px;
+  border: 1px solid #cbd7d5;
+  border-radius: 3px;
+  background: white;
+}
+.region-selector-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px 12px;
+  margin-top: 13px;
+}
+.region-selector-grid input {
+  height: 34px;
+  padding: 0 9px;
+  color: #285d64;
+  font:
+    10px/1.2 "SFMono-Regular",
+    Consolas,
+    monospace;
+  border: 1px solid #cbd7d5;
+  border-radius: 3px;
+  background: #f4f7f5;
+}
+.layout-editor-body > p {
+  margin: 11px 0 0;
+  color: #849092;
+  font-size: 9px;
+}
 .pattern-field > span,
 .rule-grid label > span {
   color: #718184;
@@ -808,6 +908,10 @@ button:focus-visible {
     grid-template-columns: 1fr 1fr;
   }
   .rule-binding {
+    grid-template-columns: 1fr;
+  }
+  .layout-meta-grid,
+  .region-selector-grid {
     grid-template-columns: 1fr;
   }
   .syntax-note span {

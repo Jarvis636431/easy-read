@@ -14,9 +14,12 @@ import {
   readThemes,
   writeActiveThemeId,
   writeExtensionEnabled,
+  writeRules,
   writeSettings,
   type EasyReadSettings,
-  type ReadingTheme
+  type ReadingTheme,
+  type SiteLayoutRule,
+  type UrlRule
 } from "~lib/settings"
 
 function IndexPopup() {
@@ -25,9 +28,14 @@ function IndexPopup() {
   const [quickThemeIds, setQuickThemeIds] = useState<string[]>([])
   const [activeThemeId, setActiveThemeId] = useState("native")
   const [extensionEnabled, setExtensionEnabled] = useState(false)
+  const [rules, setRules] = useState<UrlRule[]>([])
+  const [layoutStatus, setLayoutStatus] = useState("")
   const [site, setSite] = useState<{
     hostname: string
     supported: boolean
+    url?: string
+    tabId?: number
+    ruleId?: string
     ruleName?: string
     theme?: ReadingTheme
   } | null>(null)
@@ -53,6 +61,7 @@ function IndexPopup() {
         tabs
       ]) => {
         setSettings(value)
+        setRules(rules)
         setThemes(storedThemes)
         setQuickThemeIds(storedQuickIds)
         setActiveThemeId(activeId)
@@ -67,6 +76,9 @@ function IndexPopup() {
           setSite({
             hostname,
             supported: true,
+            url,
+            tabId: tabs[0]?.id,
+            ruleId: rule?.id,
             ruleName: rule?.name,
             theme: rule
               ? storedThemes.find((theme) => theme.id === rule.themeId)
@@ -99,6 +111,43 @@ function IndexPopup() {
         themes[0]
     )
     .filter((theme): theme is ReadingTheme => Boolean(theme))
+
+  const analyzeCurrentSite = async () => {
+    if (!site?.supported || !site.tabId || !site.url) return
+    setLayoutStatus("正在分析页面结构…")
+    try {
+      const response = (await chrome.tabs.sendMessage(site.tabId, {
+        type: "easy-read:analyze-layout"
+      })) as { layout: SiteLayoutRule; health: { score: number } }
+      const existing = rules.find((rule) => rule.id === site.ruleId)
+      const nextRule: UrlRule = existing
+        ? { ...existing, layout: response.layout }
+        : {
+            id: crypto.randomUUID(),
+            name: `${site.hostname} 布局`,
+            pattern: `${site.hostname}/*`,
+            enabled: true,
+            themeId: activeThemeId,
+            customHideSelectors: "",
+            layout: response.layout
+          }
+      const nextRules = existing
+        ? rules.map((rule) => (rule.id === existing.id ? nextRule : rule))
+        : [...rules, nextRule]
+      await writeRules(nextRules)
+      setRules(nextRules)
+      setSite((current) =>
+        current
+          ? { ...current, ruleId: nextRule.id, ruleName: nextRule.name }
+          : current
+      )
+      setLayoutStatus(
+        `已保存 · 置信度 ${Math.round(response.layout.confidence * 100)}%`
+      )
+    } catch {
+      setLayoutStatus("无法分析，请刷新网页后重试")
+    }
+  }
 
   return (
     <main className="panel" aria-busy={!ready}>
@@ -153,6 +202,14 @@ function IndexPopup() {
             {site?.theme?.name ?? (site?.supported ? "全局" : "不可用")}
           </span>
         </div>
+        {site?.supported && (
+          <button
+            className="layout-action"
+            onClick={() => void analyzeCurrentSite()}>
+            {layoutStatus ||
+              (site.ruleId ? "重新分析并保存布局" : "分析并保存当前网站布局")}
+          </button>
+        )}
       </section>
 
       <section className="section">

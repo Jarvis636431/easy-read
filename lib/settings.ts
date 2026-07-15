@@ -38,6 +38,33 @@ export type ReadingTheme = {
   settings: EasyReadSettings
 }
 
+export type LayoutRuleSource = "local" | "llm" | "manual"
+export type PageType =
+  | "article"
+  | "documentation"
+  | "forum"
+  | "feed"
+  | "conservative"
+export type LayoutStrategy = "preserve" | "balanced" | "single-column"
+export type LayoutRegion =
+  | "header"
+  | "navigation"
+  | "content"
+  | "sidebar"
+  | "comments"
+  | "footer"
+
+export type SiteLayoutRule = {
+  source: LayoutRuleSource
+  status: "draft" | "confirmed"
+  pageType: PageType
+  strategy: LayoutStrategy
+  regions: Partial<Record<LayoutRegion, string>>
+  confidence: number
+  createdAt: number
+  updatedAt: number
+}
+
 export type UrlRule = {
   id: string
   name: string
@@ -45,6 +72,7 @@ export type UrlRule = {
   enabled: boolean
   themeId: string
   customHideSelectors: string
+  layout?: SiteLayoutRule
 }
 
 export const presets: Record<ReadingMode, EasyReadSettings> = {

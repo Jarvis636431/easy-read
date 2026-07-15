@@ -13,9 +13,36 @@ import {
   writeQuickThemeIds,
   writeRules,
   type EasyReadSettings,
+  type LayoutRegion,
+  type LayoutStrategy,
+  type PageType,
   type ReadingTheme,
+  type SiteLayoutRule,
   type UrlRule
 } from "~lib/settings"
+
+const layoutRegions: Array<{ id: LayoutRegion; label: string }> = [
+  { id: "header", label: "页头" },
+  { id: "navigation", label: "导航" },
+  { id: "content", label: "主要内容" },
+  { id: "sidebar", label: "侧栏" },
+  { id: "comments", label: "评论" },
+  { id: "footer", label: "页脚" }
+]
+
+function createEmptyLayout(): SiteLayoutRule {
+  const now = Date.now()
+  return {
+    source: "manual",
+    status: "draft",
+    pageType: "conservative",
+    strategy: "preserve",
+    regions: {},
+    confidence: 0,
+    createdAt: now,
+    updatedAt: now
+  }
+}
 
 function createTheme(source: ReadingTheme = builtinThemes[1]): ReadingTheme {
   return {
@@ -136,6 +163,25 @@ function OptionsPage() {
     persistRules(
       rules.map((rule) => (rule.id === id ? { ...rule, ...patch } : rule))
     )
+  }
+
+  const updateLayout = (
+    rule: UrlRule,
+    patch: Partial<SiteLayoutRule>,
+    region?: { id: LayoutRegion; selector: string }
+  ) => {
+    const current = rule.layout ?? createEmptyLayout()
+    const layout: SiteLayoutRule = {
+      ...current,
+      ...patch,
+      source: region || Object.keys(patch).length ? "manual" : current.source,
+      status: "confirmed",
+      regions: region
+        ? { ...current.regions, [region.id]: region.selector || undefined }
+        : current.regions,
+      updatedAt: Date.now()
+    }
+    updateRule(rule.id, { layout })
   }
 
   const moveRule = (index: number, direction: -1 | 1) => {
@@ -517,6 +563,83 @@ function OptionsPage() {
                     />
                     <small>仅在该规则主题开启“隐藏广告”时生效。</small>
                   </label>
+                  <details
+                    className="layout-rule-editor"
+                    open={Boolean(rule.layout)}>
+                    <summary>
+                      <span>页面结构与重排</span>
+                      <b
+                        className={
+                          rule.layout ? "layout-ready" : "layout-empty"
+                        }>
+                        {rule.layout
+                          ? `${rule.layout.source === "local" ? "本地" : rule.layout.source === "llm" ? "AI" : "手动"} · ${Math.round(rule.layout.confidence * 100)}%`
+                          : "尚未分析"}
+                      </b>
+                    </summary>
+                    <div className="layout-editor-body">
+                      <div className="layout-meta-grid">
+                        <label>
+                          <span>页面类型</span>
+                          <select
+                            value={rule.layout?.pageType ?? "conservative"}
+                            onChange={(event) =>
+                              updateLayout(rule, {
+                                pageType: event.target.value as PageType
+                              })
+                            }>
+                            <option value="article">文章</option>
+                            <option value="documentation">文档</option>
+                            <option value="forum">论坛</option>
+                            <option value="feed">信息流</option>
+                            <option value="conservative">保守</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>布局策略</span>
+                          <select
+                            value={rule.layout?.strategy ?? "preserve"}
+                            onChange={(event) =>
+                              updateLayout(rule, {
+                                strategy: event.target.value as LayoutStrategy
+                              })
+                            }>
+                            <option value="preserve">保留布局</option>
+                            <option value="balanced">平衡重排</option>
+                            <option value="single-column">单栏重排</option>
+                          </select>
+                        </label>
+                        <button disabled title="LLM 接口将在下一阶段接入">
+                          使用 AI 分析（可选）
+                        </button>
+                      </div>
+                      <div className="region-selector-grid">
+                        {layoutRegions.map((region) => (
+                          <label key={region.id}>
+                            <span>{region.label}</span>
+                            <input
+                              value={rule.layout?.regions[region.id] ?? ""}
+                              placeholder={`CSS selector for ${region.id}`}
+                              onChange={(event) =>
+                                updateLayout(
+                                  rule,
+                                  {},
+                                  {
+                                    id: region.id,
+                                    selector: event.target.value
+                                  }
+                                )
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <p>
+                        从 Popup
+                        点击“分析并保存当前网站布局”可自动生成；手动修改后将标记为已确认规则。
+                      </p>
+                    </div>
+                  </details>
                   <div className="rule-footer">
                     <span>主题参数由主题库统一管理</span>
                     <button

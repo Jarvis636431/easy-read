@@ -156,6 +156,17 @@ h1 {
   border: 1px solid #18303922;
   border-radius: 2px;
 }
+.layout-action {
+  grid-column: 2 / 4;
+  justify-self: start;
+  padding: 3px 0 0;
+  color: #287781;
+  font-size: 9px;
+  font-weight: 700;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
 .section {
   padding: 18px 22px 18px 28px;
   border-bottom: 1px solid #dbe1df;
