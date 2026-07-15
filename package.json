@@ -26,11 +26,21 @@
   "manifest": {
     "permissions": [
       "activeTab",
+      "declarativeNetRequest",
       "storage"
     ],
     "host_permissions": [
       "http://*/*",
       "https://*/*"
-    ]
+    ],
+    "declarative_net_request": {
+      "rule_resources": [
+        {
+          "id": "easy_read_ads",
+          "enabled": true,
+          "path": "~rules/ads.json"
+        }
+      ]
+    }
   }
 }

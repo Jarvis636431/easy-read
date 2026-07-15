@@ -20,6 +20,8 @@ export type EasyReadSettings = {
 export const STORAGE_KEY = "easyReadSettings"
 export const RULES_STORAGE_KEY = "easyReadUrlRules"
 export const THEMES_STORAGE_KEY = "easyReadCustomThemes"
+export const NETWORK_BLOCKING_STORAGE_KEY = "easyReadNetworkAdBlocking"
+export const AD_RULESET_ID = "easy_read_ads"
 
 export type ReadingTheme = {
   id: string
@@ -197,6 +199,15 @@ export async function writeCustomThemes(themes: ReadingTheme[]) {
 
 export async function writeRules(rules: UrlRule[]) {
   await chrome.storage.local.set({ [RULES_STORAGE_KEY]: rules })
+}
+
+export async function readNetworkBlocking(): Promise<boolean> {
+  const result = await chrome.storage.local.get(NETWORK_BLOCKING_STORAGE_KEY)
+  return result[NETWORK_BLOCKING_STORAGE_KEY] !== false
+}
+
+export async function writeNetworkBlocking(enabled: boolean) {
+  await chrome.storage.local.set({ [NETWORK_BLOCKING_STORAGE_KEY]: enabled })
 }
 
 export function matchesUrl(pattern: string, url: string) {

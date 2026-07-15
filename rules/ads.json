@@ -1,0 +1,81 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "requestDomains": [
+        "doubleclick.net",
+        "googlesyndication.com",
+        "googleadservices.com",
+        "adservice.google.com",
+        "amazon-adsystem.com"
+      ],
+      "domainType": "thirdParty",
+      "resourceTypes": [
+        "script",
+        "image",
+        "sub_frame",
+        "xmlhttprequest",
+        "media",
+        "font"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "requestDomains": [
+        "adnxs.com",
+        "adsrvr.org",
+        "casalemedia.com",
+        "openx.net",
+        "pubmatic.com",
+        "rubiconproject.com",
+        "serving-sys.com"
+      ],
+      "domainType": "thirdParty",
+      "resourceTypes": [
+        "script",
+        "image",
+        "sub_frame",
+        "xmlhttprequest",
+        "media"
+      ]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "requestDomains": [
+        "criteo.com",
+        "criteo.net",
+        "moatads.com",
+        "scorecardresearch.com",
+        "zedo.com"
+      ],
+      "domainType": "thirdParty",
+      "resourceTypes": [
+        "script",
+        "image",
+        "sub_frame",
+        "xmlhttprequest",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 4,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "requestDomains": ["outbrain.com", "taboola.com"],
+      "domainType": "thirdParty",
+      "resourceTypes": ["script", "image", "sub_frame", "xmlhttprequest"]
+    }
+  }
+]

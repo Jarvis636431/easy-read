@@ -4,9 +4,11 @@ import "./options.css"
 
 import {
   builtinThemes,
+  readNetworkBlocking,
   readRules,
   readThemes,
   writeCustomThemes,
+  writeNetworkBlocking,
   writeRules,
   type EasyReadSettings,
   type ReadingTheme,
@@ -38,12 +40,14 @@ function OptionsPage() {
   const [rules, setRules] = useState<UrlRule[]>([])
   const [selectedId, setSelectedId] = useState("comfortable")
   const [saved, setSaved] = useState(false)
+  const [networkBlocking, setNetworkBlocking] = useState(true)
 
   useEffect(() => {
-    Promise.all([readThemes(), readRules()]).then(
-      ([storedThemes, storedRules]) => {
+    Promise.all([readThemes(), readRules(), readNetworkBlocking()]).then(
+      ([storedThemes, storedRules, storedNetworkBlocking]) => {
         setThemes(storedThemes)
         setRules(storedRules)
+        setNetworkBlocking(storedNetworkBlocking)
       }
     )
   }, [])
@@ -326,6 +330,26 @@ function OptionsPage() {
             ＋ 添加规则
           </button>
         </div>
+        <label className="network-blocking-card">
+          <div className="network-icon" aria-hidden="true">
+            ⊘
+          </div>
+          <span>
+            <strong>网络广告拦截</strong>
+            <small>在第三方广告脚本、图片和 iframe 下载前阻止请求</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={networkBlocking}
+            onChange={(event) => {
+              const enabled = event.target.checked
+              setNetworkBlocking(enabled)
+              void writeNetworkBlocking(enabled).then(showSaved)
+            }}
+          />
+          <i aria-hidden="true" />
+          <b>{networkBlocking ? "已开启" : "已关闭"}</b>
+        </label>
         <aside className="syntax-note">
           <strong>匹配示例</strong>
           <code>*.zhihu.com/*</code>

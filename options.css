@@ -286,6 +286,72 @@ button {
   padding-top: 31px;
   border-top: 1px solid #becac9;
 }
+.network-blocking-card {
+  display: grid;
+  grid-template-columns: 38px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 13px 15px;
+  cursor: pointer;
+  border: 1px solid #b9ceca;
+  border-radius: 4px;
+  background: #e8f0ed;
+}
+.network-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: #286e75;
+  font-size: 21px;
+  border: 1px solid #a9c4c0;
+  border-radius: 50%;
+  background: #f8faf8;
+}
+.network-blocking-card > span {
+  display: grid;
+  gap: 3px;
+}
+.network-blocking-card strong {
+  color: #234147;
+  font-size: 12px;
+}
+.network-blocking-card small {
+  color: #6f8183;
+  font-size: 10px;
+}
+.network-blocking-card input {
+  position: absolute;
+  opacity: 0;
+}
+.network-blocking-card > i {
+  width: 34px;
+  height: 19px;
+  padding: 3px;
+  border-radius: 12px;
+  background: #b8c6c4;
+}
+.network-blocking-card > i::after {
+  content: "";
+  display: block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s ease;
+}
+.network-blocking-card input:checked + i {
+  background: #287781;
+}
+.network-blocking-card input:checked + i::after {
+  transform: translateX(15px);
+}
+.network-blocking-card > b {
+  min-width: 38px;
+  color: #65787a;
+  font-size: 9px;
+}
 .options-header {
   display: flex;
   align-items: end;
