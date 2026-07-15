@@ -1,7 +1,6 @@
 export type ReadingMode = "native" | "comfortable" | "night" | "immersive"
 
 export type EasyReadSettings = {
-  enabled: boolean
   mode: ReadingMode
   fontSize: number
   lineHeight: number
@@ -24,6 +23,7 @@ export const NETWORK_BLOCKING_STORAGE_KEY = "easyReadNetworkAdBlocking"
 export const AD_RULESET_ID = "easy_read_ads"
 export const QUICK_THEMES_STORAGE_KEY = "easyReadQuickThemeIds"
 export const ACTIVE_THEME_STORAGE_KEY = "easyReadActiveThemeId"
+export const EXTENSION_ENABLED_STORAGE_KEY = "easyReadExtensionEnabled"
 export const defaultQuickThemeIds = [
   "native",
   "comfortable",
@@ -49,7 +49,6 @@ export type UrlRule = {
 
 export const presets: Record<ReadingMode, EasyReadSettings> = {
   native: {
-    enabled: false,
     mode: "native",
     fontSize: 16,
     lineHeight: 1.6,
@@ -65,7 +64,6 @@ export const presets: Record<ReadingMode, EasyReadSettings> = {
     headingFontFamily: 'Georgia, "Songti SC", serif'
   },
   comfortable: {
-    enabled: true,
     mode: "comfortable",
     fontSize: 18,
     lineHeight: 1.8,
@@ -81,7 +79,6 @@ export const presets: Record<ReadingMode, EasyReadSettings> = {
     headingFontFamily: 'Georgia, "Songti SC", serif'
   },
   night: {
-    enabled: true,
     mode: "night",
     fontSize: 18,
     lineHeight: 1.85,
@@ -97,7 +94,6 @@ export const presets: Record<ReadingMode, EasyReadSettings> = {
     headingFontFamily: 'Georgia, "Songti SC", serif'
   },
   immersive: {
-    enabled: true,
     mode: "immersive",
     fontSize: 19,
     lineHeight: 1.9,
@@ -131,7 +127,6 @@ export const builtinThemes: ReadingTheme[] = [
     name: "Claude 暖纸",
     builtin: true,
     settings: {
-      enabled: true,
       mode: "comfortable",
       fontSize: 18,
       lineHeight: 1.7,
@@ -153,7 +148,6 @@ export const builtinThemes: ReadingTheme[] = [
     name: "Kindle 纸张",
     builtin: true,
     settings: {
-      enabled: true,
       mode: "comfortable",
       fontSize: 19,
       lineHeight: 1.9,
@@ -173,7 +167,7 @@ export const builtinThemes: ReadingTheme[] = [
   }
 ]
 
-export const defaultSettings = presets.native
+export const defaultSettings = presets.comfortable
 
 export async function readSettings(): Promise<EasyReadSettings> {
   const result = await chrome.storage.local.get(STORAGE_KEY)
@@ -234,11 +228,20 @@ export async function writeQuickThemeIds(themeIds: string[]) {
 
 export async function readActiveThemeId(): Promise<string> {
   const result = await chrome.storage.local.get(ACTIVE_THEME_STORAGE_KEY)
-  return result[ACTIVE_THEME_STORAGE_KEY] ?? "native"
+  return result[ACTIVE_THEME_STORAGE_KEY] ?? "comfortable"
 }
 
 export async function writeActiveThemeId(themeId: string) {
   await chrome.storage.local.set({ [ACTIVE_THEME_STORAGE_KEY]: themeId })
+}
+
+export async function readExtensionEnabled(): Promise<boolean> {
+  const result = await chrome.storage.local.get(EXTENSION_ENABLED_STORAGE_KEY)
+  return result[EXTENSION_ENABLED_STORAGE_KEY] === true
+}
+
+export async function writeExtensionEnabled(enabled: boolean) {
+  await chrome.storage.local.set({ [EXTENSION_ENABLED_STORAGE_KEY]: enabled })
 }
 
 export function matchesUrl(pattern: string, url: string) {

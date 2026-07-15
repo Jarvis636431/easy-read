@@ -1,7 +1,9 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import {
+  EXTENSION_ENABLED_STORAGE_KEY,
   findMatchingRule,
+  readExtensionEnabled,
   readRules,
   readSettings,
   readThemes,
@@ -95,12 +97,14 @@ function buildStyles(
 
 function applySettings(
   settings: EasyReadSettings,
-  customHideSelectors: string[] = []
+  customHideSelectors: string[] = [],
+  extensionEnabled = false
 ) {
-  document.documentElement.classList.toggle(ROOT_CLASS, settings.enabled)
+  const shouldApply = extensionEnabled && settings.mode !== "native"
+  document.documentElement.classList.toggle(ROOT_CLASS, shouldApply)
   document.getElementById(STYLE_ID)?.remove()
 
-  if (!settings.enabled) return
+  if (!shouldApply) return
 
   const style = document.createElement("style")
   style.id = STYLE_ID
@@ -109,15 +113,17 @@ function applySettings(
 }
 
 async function refreshSettings() {
-  const [settings, rules, themes] = await Promise.all([
+  const [settings, rules, themes, extensionEnabled] = await Promise.all([
     readSettings(),
     readRules(),
-    readThemes()
+    readThemes(),
+    readExtensionEnabled()
   ])
   const rule = findMatchingRule(location.href, rules)
   applySettings(
     resolveSettings(location.href, settings, rules, themes),
-    parseCustomSelectors(rule?.customHideSelectors)
+    parseCustomSelectors(rule?.customHideSelectors),
+    extensionEnabled
   )
 }
 
@@ -143,7 +149,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     areaName === "local" &&
     (changes[STORAGE_KEY] ||
       changes[RULES_STORAGE_KEY] ||
-      changes[THEMES_STORAGE_KEY])
+      changes[THEMES_STORAGE_KEY] ||
+      changes[EXTENSION_ENABLED_STORAGE_KEY])
   ) {
     void refreshSettings()
   }

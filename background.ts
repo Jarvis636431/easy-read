@@ -1,11 +1,17 @@
 import {
   AD_RULESET_ID,
+  EXTENSION_ENABLED_STORAGE_KEY,
   NETWORK_BLOCKING_STORAGE_KEY,
+  readExtensionEnabled,
   readNetworkBlocking
 } from "~lib/settings"
 
 async function syncNetworkBlocking() {
-  const enabled = await readNetworkBlocking()
+  const [networkBlocking, extensionEnabled] = await Promise.all([
+    readNetworkBlocking(),
+    readExtensionEnabled()
+  ])
+  const enabled = networkBlocking && extensionEnabled
   await chrome.declarativeNetRequest.updateEnabledRulesets({
     enableRulesetIds: enabled ? [AD_RULESET_ID] : [],
     disableRulesetIds: enabled ? [] : [AD_RULESET_ID]
@@ -23,7 +29,11 @@ chrome.runtime.onStartup.addListener(() => {
 })
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "local" && changes[NETWORK_BLOCKING_STORAGE_KEY]) {
+  if (
+    areaName === "local" &&
+    (changes[NETWORK_BLOCKING_STORAGE_KEY] ||
+      changes[EXTENSION_ENABLED_STORAGE_KEY])
+  ) {
     void syncNetworkBlocking()
   }
 })

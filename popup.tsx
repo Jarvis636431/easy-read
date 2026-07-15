@@ -7,11 +7,13 @@ import {
   defaultSettings,
   findMatchingRule,
   readActiveThemeId,
+  readExtensionEnabled,
   readQuickThemeIds,
   readRules,
   readSettings,
   readThemes,
   writeActiveThemeId,
+  writeExtensionEnabled,
   writeSettings,
   type EasyReadSettings,
   type ReadingTheme
@@ -22,6 +24,7 @@ function IndexPopup() {
   const [themes, setThemes] = useState<ReadingTheme[]>([])
   const [quickThemeIds, setQuickThemeIds] = useState<string[]>([])
   const [activeThemeId, setActiveThemeId] = useState("native")
+  const [extensionEnabled, setExtensionEnabled] = useState(false)
   const [site, setSite] = useState<{
     hostname: string
     supported: boolean
@@ -37,30 +40,42 @@ function IndexPopup() {
       readThemes(),
       readQuickThemeIds(),
       readActiveThemeId(),
+      readExtensionEnabled(),
       chrome.tabs.query({ active: true, currentWindow: true })
-    ]).then(([value, rules, storedThemes, storedQuickIds, activeId, tabs]) => {
-      setSettings(value)
-      setThemes(storedThemes)
-      setQuickThemeIds(storedQuickIds)
-      setActiveThemeId(activeId)
+    ]).then(
+      ([
+        value,
+        rules,
+        storedThemes,
+        storedQuickIds,
+        activeId,
+        enabled,
+        tabs
+      ]) => {
+        setSettings(value)
+        setThemes(storedThemes)
+        setQuickThemeIds(storedQuickIds)
+        setActiveThemeId(activeId)
+        setExtensionEnabled(enabled)
 
-      const url = tabs[0]?.url
-      if (!url || !/^https?:\/\//i.test(url)) {
-        setSite({ hostname: "浏览器内部页面", supported: false })
-      } else {
-        const hostname = new URL(url).hostname
-        const rule = findMatchingRule(url, rules)
-        setSite({
-          hostname,
-          supported: true,
-          ruleName: rule?.name,
-          theme: rule
-            ? storedThemes.find((theme) => theme.id === rule.themeId)
-            : undefined
-        })
+        const url = tabs[0]?.url
+        if (!url || !/^https?:\/\//i.test(url)) {
+          setSite({ hostname: "浏览器内部页面", supported: false })
+        } else {
+          const hostname = new URL(url).hostname
+          const rule = findMatchingRule(url, rules)
+          setSite({
+            hostname,
+            supported: true,
+            ruleName: rule?.name,
+            theme: rule
+              ? storedThemes.find((theme) => theme.id === rule.themeId)
+              : undefined
+          })
+        }
+        setReady(true)
       }
-      setReady(true)
-    })
+    )
   }, [])
 
   const update = (patch: Partial<EasyReadSettings>) => {
@@ -95,11 +110,15 @@ function IndexPopup() {
         <label className="power">
           <input
             type="checkbox"
-            checked={settings.enabled}
-            onChange={(event) => update({ enabled: event.target.checked })}
+            checked={extensionEnabled}
+            onChange={(event) => {
+              const enabled = event.target.checked
+              setExtensionEnabled(enabled)
+              void writeExtensionEnabled(enabled)
+            }}
           />
           <span aria-hidden="true" />
-          <b>{settings.enabled ? "已启用" : "已关闭"}</b>
+          <b>{extensionEnabled ? "已启用" : "已关闭"}</b>
         </label>
       </header>
 
@@ -170,7 +189,7 @@ function IndexPopup() {
           min={14}
           max={24}
           suffix="px"
-          onChange={(fontSize) => update({ fontSize, enabled: true })}
+          onChange={(fontSize) => update({ fontSize })}
         />
         <Range
           label="行高"
@@ -178,7 +197,7 @@ function IndexPopup() {
           min={1.4}
           max={2.2}
           step={0.05}
-          onChange={(lineHeight) => update({ lineHeight, enabled: true })}
+          onChange={(lineHeight) => update({ lineHeight })}
         />
         <Range
           label="宽度"
@@ -187,7 +206,7 @@ function IndexPopup() {
           max={1200}
           step={20}
           suffix="px"
-          onChange={(contentWidth) => update({ contentWidth, enabled: true })}
+          onChange={(contentWidth) => update({ contentWidth })}
         />
       </section>
 

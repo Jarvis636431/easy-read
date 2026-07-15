@@ -22,7 +22,7 @@ function createTheme(source: ReadingTheme = builtinThemes[1]): ReadingTheme {
     id: crypto.randomUUID(),
     name: `${source.name}副本`,
     builtin: false,
-    settings: { ...source.settings, mode: "comfortable", enabled: true }
+    settings: { ...source.settings, mode: "comfortable" }
   }
 }
 
