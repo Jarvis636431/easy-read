@@ -136,6 +136,29 @@ export const builtinThemes: ReadingTheme[] = [
         '"Anthropic Sans", "Helvetica Neue", Arial, "PingFang SC", sans-serif',
       headingFontFamily: '"Anthropic Serif", Georgia, "Songti SC", serif'
     }
+  },
+  {
+    id: "kindle",
+    name: "Kindle 纸张",
+    builtin: true,
+    settings: {
+      enabled: true,
+      mode: "comfortable",
+      fontSize: 19,
+      lineHeight: 1.9,
+      contentWidth: 720,
+      hideAds: true,
+      hideSidebars: true,
+      pageColor: "#E8E3D5",
+      contentColor: "#F4F1E8",
+      textColor: "#292821",
+      linkColor: "#725B3A",
+      imageBrightness: 0.9,
+      fontFamily:
+        '"Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif',
+      headingFontFamily:
+        '"Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif'
+    }
   }
 ]
 
