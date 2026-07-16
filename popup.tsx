@@ -2,12 +2,14 @@ import { useEffect, useState } from "react"
 
 import "./popup.css"
 
+import type { DomSummary } from "~lib/layout"
 import {
   defaultQuickThemeIds,
   defaultSettings,
   findMatchingRule,
   readActiveThemeId,
   readExtensionEnabled,
+  readLlmSettings,
   readQuickThemeIds,
   readRules,
   readSettings,
@@ -17,6 +19,7 @@ import {
   writeRules,
   writeSettings,
   type EasyReadSettings,
+  type LlmSettings,
   type ReadingTheme,
   type SiteLayoutRule,
   type UrlRule
@@ -30,6 +33,8 @@ function IndexPopup() {
   const [extensionEnabled, setExtensionEnabled] = useState(false)
   const [rules, setRules] = useState<UrlRule[]>([])
   const [layoutStatus, setLayoutStatus] = useState("")
+  const [llmSettings, setLlmSettings] = useState<LlmSettings | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
   const [site, setSite] = useState<{
     hostname: string
     supported: boolean
@@ -49,6 +54,7 @@ function IndexPopup() {
       readQuickThemeIds(),
       readActiveThemeId(),
       readExtensionEnabled(),
+      readLlmSettings(),
       chrome.tabs.query({ active: true, currentWindow: true })
     ]).then(
       ([
@@ -58,6 +64,7 @@ function IndexPopup() {
         storedQuickIds,
         activeId,
         enabled,
+        storedLlmSettings,
         tabs
       ]) => {
         setSettings(value)
@@ -66,6 +73,7 @@ function IndexPopup() {
         setQuickThemeIds(storedQuickIds)
         setActiveThemeId(activeId)
         setExtensionEnabled(enabled)
+        setLlmSettings(storedLlmSettings)
 
         const url = tabs[0]?.url
         if (!url || !/^https?:\/\//i.test(url)) {
@@ -112,42 +120,86 @@ function IndexPopup() {
     )
     .filter((theme): theme is ReadingTheme => Boolean(theme))
 
+  const saveLayout = async (layout: SiteLayoutRule) => {
+    if (!site?.url) return
+    const existing = rules.find((rule) => rule.id === site.ruleId)
+    const nextRule: UrlRule = existing
+      ? { ...existing, layout }
+      : {
+          id: crypto.randomUUID(),
+          name: `${site.hostname} 布局`,
+          pattern: `${site.hostname}/*`,
+          enabled: true,
+          themeId: activeThemeId,
+          customHideSelectors: "",
+          layout
+        }
+    const nextRules = existing
+      ? rules.map((rule) => (rule.id === existing.id ? nextRule : rule))
+      : [...rules, nextRule]
+    await writeRules(nextRules)
+    setRules(nextRules)
+    setSite((current) =>
+      current
+        ? { ...current, ruleId: nextRule.id, ruleName: nextRule.name }
+        : current
+    )
+  }
+
   const analyzeCurrentSite = async () => {
     if (!site?.supported || !site.tabId || !site.url) return
+    setAnalyzing(true)
     setLayoutStatus("正在分析页面结构…")
     try {
       const response = (await chrome.tabs.sendMessage(site.tabId, {
         type: "easy-read:analyze-layout"
       })) as { layout: SiteLayoutRule; health: { score: number } }
-      const existing = rules.find((rule) => rule.id === site.ruleId)
-      const nextRule: UrlRule = existing
-        ? { ...existing, layout: response.layout }
-        : {
-            id: crypto.randomUUID(),
-            name: `${site.hostname} 布局`,
-            pattern: `${site.hostname}/*`,
-            enabled: true,
-            themeId: activeThemeId,
-            customHideSelectors: "",
-            layout: response.layout
-          }
-      const nextRules = existing
-        ? rules.map((rule) => (rule.id === existing.id ? nextRule : rule))
-        : [...rules, nextRule]
-      await writeRules(nextRules)
-      setRules(nextRules)
-      setSite((current) =>
-        current
-          ? { ...current, ruleId: nextRule.id, ruleName: nextRule.name }
-          : current
-      )
+      await saveLayout(response.layout)
       setLayoutStatus(
         `已保存 · 置信度 ${Math.round(response.layout.confidence * 100)}%`
       )
     } catch {
       setLayoutStatus("无法分析，请刷新网页后重试")
+    } finally {
+      setAnalyzing(false)
     }
   }
+
+  const analyzeCurrentSiteWithAi = async () => {
+    if (!site?.supported || !site.tabId || !site.url) return
+    setAnalyzing(true)
+    setLayoutStatus("正在生成安全结构摘要…")
+    try {
+      const summaryResponse = (await chrome.tabs.sendMessage(site.tabId, {
+        type: "easy-read:get-layout-summary"
+      })) as { summary: DomSummary }
+      setLayoutStatus("AI 正在识别页面结构…")
+      const response = (await chrome.runtime.sendMessage({
+        type: "easy-read:analyze-layout-with-llm",
+        summary: summaryResponse.summary
+      })) as { ok: boolean; layout?: SiteLayoutRule; error?: string }
+      if (!response.ok || !response.layout)
+        throw new Error(response.error ?? "AI 分析失败")
+      const validation = (await chrome.tabs.sendMessage(site.tabId, {
+        type: "easy-read:validate-layout",
+        layout: response.layout
+      })) as { health: { valid: boolean; score: number } }
+      if (!validation.health.valid) throw new Error("AI 规则未通过当前页面校验")
+      await saveLayout(response.layout)
+      setLayoutStatus("AI 草稿已保存，请到设置页确认")
+    } catch (error) {
+      setLayoutStatus(error instanceof Error ? error.message : "AI 分析失败")
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const activeProvider = llmSettings?.providers.find(
+    (provider) => provider.id === llmSettings.activeProviderId
+  )
+  const aiReady = Boolean(
+    llmSettings?.enabled && activeProvider?.apiKey && activeProvider.model
+  )
 
   return (
     <main className="panel" aria-busy={!ready}>
@@ -203,12 +255,22 @@ function IndexPopup() {
           </span>
         </div>
         {site?.supported && (
-          <button
-            className="layout-action"
-            onClick={() => void analyzeCurrentSite()}>
-            {layoutStatus ||
-              (site.ruleId ? "重新分析并保存布局" : "分析并保存当前网站布局")}
-          </button>
+          <div className="layout-actions">
+            <button
+              disabled={analyzing}
+              onClick={() => void analyzeCurrentSite()}>
+              本地分析
+            </button>
+            <button
+              disabled={analyzing || !aiReady}
+              title={
+                aiReady ? "生成待确认的 AI 布局草稿" : "请先在设置页配置 AI"
+              }
+              onClick={() => void analyzeCurrentSiteWithAi()}>
+              AI 分析
+            </button>
+            {layoutStatus && <span>{layoutStatus}</span>}
+          </div>
         )}
       </section>
 

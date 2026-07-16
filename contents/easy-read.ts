@@ -1,6 +1,10 @@
 import type { PlasmoCSConfig } from "plasmo"
 
-import { analyzeDocument, checkLayoutHealth } from "~lib/layout"
+import {
+  analyzeDocument,
+  checkLayoutHealth,
+  createDomSummary
+} from "~lib/layout"
 import {
   EXTENSION_ENABLED_STORAGE_KEY,
   findMatchingRule,
@@ -165,7 +169,10 @@ async function refreshSettings() {
   if (extensionEnabled && resolvedSettings.mode !== "native") {
     const savedLayout = rule?.layout
     const savedHealth = checkLayoutHealth(savedLayout)
-    const layout = savedHealth.valid ? savedLayout : analyzeDocument()
+    const layout =
+      savedLayout?.status === "confirmed" && savedHealth.valid
+        ? savedLayout
+        : analyzeDocument()
     applyLayoutRule(layout)
   } else {
     clearLayoutMarkers()
@@ -209,10 +216,17 @@ function refreshWhenReady() {
 refreshWhenReady()
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "easy-read:analyze-layout") return
-  const layout = analyzeDocument()
-  const health = checkLayoutHealth(layout)
-  sendResponse({ layout, health })
+  if (message?.type === "easy-read:analyze-layout") {
+    const layout = analyzeDocument()
+    const health = checkLayoutHealth(layout)
+    sendResponse({ layout, health })
+  }
+  if (message?.type === "easy-read:get-layout-summary") {
+    sendResponse({ summary: createDomSummary() })
+  }
+  if (message?.type === "easy-read:validate-layout") {
+    sendResponse({ health: checkLayoutHealth(message.layout) })
+  }
 })
 
 chrome.storage.onChanged.addListener((changes, areaName) => {

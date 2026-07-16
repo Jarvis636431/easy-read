@@ -16,6 +16,26 @@ export type LayoutHealth = {
   missingRegions: LayoutRegion[]
 }
 
+export type DomSummaryNode = {
+  selector: string
+  tag: string
+  role?: string
+  landmark?: string
+  zone: "top" | "middle" | "bottom"
+  widthRatio: number
+  textLength: number
+  paragraphs: number
+  headings: number
+  links: number
+}
+
+export type DomSummary = {
+  url: string
+  viewport: { width: number; height: number }
+  documentHeight: number
+  nodes: DomSummaryNode[]
+}
+
 function elementName(element: Element) {
   return [
     element.id,
@@ -203,6 +223,56 @@ export function analyzeDocument(): SiteLayoutRule {
       : 0,
     createdAt: now,
     updatedAt: now
+  }
+}
+
+export function createDomSummary(): DomSummary {
+  const candidates = Array.from(
+    document.querySelectorAll(
+      "header, nav, main, article, aside, footer, section, [role], body > div"
+    )
+  )
+    .filter(isVisible)
+    .slice(0, 180)
+  const documentHeight = Math.max(
+    document.documentElement.scrollHeight,
+    document.body?.scrollHeight ?? 0,
+    innerHeight
+  )
+
+  return {
+    url: `${location.origin}${location.pathname}`,
+    viewport: { width: innerWidth, height: innerHeight },
+    documentHeight,
+    nodes: candidates.flatMap((element) => {
+      const selector = selectorFor(element)
+      if (!selector) return []
+      const rect = element.getBoundingClientRect()
+      const stats = textStats(element)
+      const center = rect.top + scrollY + rect.height / 2
+      const landmark = (Object.keys(REGION_HINTS) as LayoutRegion[]).find(
+        (region) => scoreElement(element, region) >= 70
+      )
+      return [
+        {
+          selector,
+          tag: element.tagName.toLowerCase(),
+          role: element.getAttribute("role") || undefined,
+          landmark,
+          zone:
+            center < documentHeight * 0.25
+              ? "top"
+              : center > documentHeight * 0.75
+                ? "bottom"
+                : "middle",
+          widthRatio: Number((rect.width / Math.max(innerWidth, 1)).toFixed(2)),
+          textLength: Math.min(stats.textLength, 20_000),
+          paragraphs: stats.paragraphs,
+          headings: stats.headings,
+          links: element.querySelectorAll("a").length
+        } satisfies DomSummaryNode
+      ]
+    })
   }
 }
 

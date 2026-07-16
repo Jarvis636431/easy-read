@@ -24,6 +24,7 @@ export const AD_RULESET_ID = "easy_read_ads"
 export const QUICK_THEMES_STORAGE_KEY = "easyReadQuickThemeIds"
 export const ACTIVE_THEME_STORAGE_KEY = "easyReadActiveThemeId"
 export const EXTENSION_ENABLED_STORAGE_KEY = "easyReadExtensionEnabled"
+export const LLM_SETTINGS_STORAGE_KEY = "easyReadLlmSettings"
 export const defaultQuickThemeIds = [
   "native",
   "comfortable",
@@ -63,6 +64,46 @@ export type SiteLayoutRule = {
   confidence: number
   createdAt: number
   updatedAt: number
+}
+
+export type LlmProviderType = "openai-compatible" | "anthropic"
+
+export type LlmProvider = {
+  id: string
+  name: string
+  type: LlmProviderType
+  baseUrl: string
+  model: string
+  apiKey: string
+}
+
+export type LlmSettings = {
+  enabled: boolean
+  activeProviderId: string
+  providers: LlmProvider[]
+}
+
+export const defaultLlmSettings: LlmSettings = {
+  enabled: false,
+  activeProviderId: "openai",
+  providers: [
+    {
+      id: "openai",
+      name: "OpenAI compatible",
+      type: "openai-compatible",
+      baseUrl: "https://api.openai.com/v1",
+      model: "",
+      apiKey: ""
+    },
+    {
+      id: "anthropic",
+      name: "Anthropic",
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com",
+      model: "",
+      apiKey: ""
+    }
+  ]
 }
 
 export type UrlRule = {
@@ -270,6 +311,22 @@ export async function readExtensionEnabled(): Promise<boolean> {
 
 export async function writeExtensionEnabled(enabled: boolean) {
   await chrome.storage.local.set({ [EXTENSION_ENABLED_STORAGE_KEY]: enabled })
+}
+
+export async function readLlmSettings(): Promise<LlmSettings> {
+  const result = await chrome.storage.local.get(LLM_SETTINGS_STORAGE_KEY)
+  const stored = result[LLM_SETTINGS_STORAGE_KEY] as Partial<LlmSettings>
+  return {
+    ...defaultLlmSettings,
+    ...stored,
+    providers: Array.isArray(stored?.providers)
+      ? stored.providers
+      : defaultLlmSettings.providers
+  }
+}
+
+export async function writeLlmSettings(settings: LlmSettings) {
+  await chrome.storage.local.set({ [LLM_SETTINGS_STORAGE_KEY]: settings })
 }
 
 export function matchesUrl(pattern: string, url: string) {

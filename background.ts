@@ -1,8 +1,11 @@
+import type { DomSummary } from "~lib/layout"
+import { analyzeLayoutWithLlm } from "~lib/llm"
 import {
   AD_RULESET_ID,
   EXTENSION_ENABLED_STORAGE_KEY,
   NETWORK_BLOCKING_STORAGE_KEY,
   readExtensionEnabled,
+  readLlmSettings,
   readNetworkBlocking
 } from "~lib/settings"
 
@@ -36,4 +39,29 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   ) {
     void syncNetworkBlocking()
   }
+})
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== "easy-read:analyze-layout-with-llm") return
+  void (async () => {
+    try {
+      const settings = await readLlmSettings()
+      if (!settings.enabled) throw new Error("请先在设置页启用 AI 分析")
+      const provider = settings.providers.find(
+        (item) => item.id === settings.activeProviderId
+      )
+      if (!provider) throw new Error("未找到当前 AI 供应商")
+      const layout = await analyzeLayoutWithLlm(
+        provider,
+        message.summary as DomSummary
+      )
+      sendResponse({ ok: true, layout })
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : "AI 分析失败"
+      })
+    }
+  })()
+  return true
 })

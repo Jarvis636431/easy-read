@@ -4,17 +4,23 @@ import "./options.css"
 
 import {
   builtinThemes,
+  defaultLlmSettings,
+  readLlmSettings,
   readNetworkBlocking,
   readQuickThemeIds,
   readRules,
   readThemes,
   writeCustomThemes,
+  writeLlmSettings,
   writeNetworkBlocking,
   writeQuickThemeIds,
   writeRules,
   type EasyReadSettings,
   type LayoutRegion,
   type LayoutStrategy,
+  type LlmProvider,
+  type LlmProviderType,
+  type LlmSettings,
   type PageType,
   type ReadingTheme,
   type SiteLayoutRule,
@@ -64,6 +70,20 @@ function createRule(themeId: string): UrlRule {
   }
 }
 
+function createProvider(type: LlmProviderType): LlmProvider {
+  return {
+    id: crypto.randomUUID(),
+    name: type === "anthropic" ? "Anthropic" : "OpenAI compatible",
+    type,
+    baseUrl:
+      type === "anthropic"
+        ? "https://api.anthropic.com"
+        : "https://api.openai.com/v1",
+    model: "",
+    apiKey: ""
+  }
+}
+
 function OptionsPage() {
   const [themes, setThemes] = useState<ReadingTheme[]>(builtinThemes)
   const [rules, setRules] = useState<UrlRule[]>([])
@@ -71,19 +91,29 @@ function OptionsPage() {
   const [saved, setSaved] = useState(false)
   const [networkBlocking, setNetworkBlocking] = useState(true)
   const [quickThemeIds, setQuickThemeIds] = useState<string[]>([])
+  const [llmSettings, setLlmSettings] =
+    useState<LlmSettings>(defaultLlmSettings)
 
   useEffect(() => {
     Promise.all([
       readThemes(),
       readRules(),
       readNetworkBlocking(),
-      readQuickThemeIds()
+      readQuickThemeIds(),
+      readLlmSettings()
     ]).then(
-      ([storedThemes, storedRules, storedNetworkBlocking, storedQuickIds]) => {
+      ([
+        storedThemes,
+        storedRules,
+        storedNetworkBlocking,
+        storedQuickIds,
+        storedLlmSettings
+      ]) => {
         setThemes(storedThemes)
         setRules(storedRules)
         setNetworkBlocking(storedNetworkBlocking)
         setQuickThemeIds(storedQuickIds)
+        setLlmSettings(storedLlmSettings)
       }
     )
   }, [])
@@ -106,6 +136,43 @@ function OptionsPage() {
   const persistRules = (next: UrlRule[]) => {
     setRules(next)
     void writeRules(next).then(showSaved)
+  }
+
+  const persistLlmSettings = (next: LlmSettings) => {
+    setLlmSettings(next)
+    void writeLlmSettings(next).then(showSaved)
+  }
+
+  const updateProvider = (id: string, patch: Partial<LlmProvider>) => {
+    persistLlmSettings({
+      ...llmSettings,
+      providers: llmSettings.providers.map((provider) =>
+        provider.id === id ? { ...provider, ...patch } : provider
+      )
+    })
+  }
+
+  const addProvider = (type: LlmProviderType) => {
+    const provider = createProvider(type)
+    persistLlmSettings({
+      ...llmSettings,
+      activeProviderId: provider.id,
+      providers: [...llmSettings.providers, provider]
+    })
+  }
+
+  const deleteProvider = (id: string) => {
+    const providers = llmSettings.providers.filter(
+      (provider) => provider.id !== id
+    )
+    persistLlmSettings({
+      ...llmSettings,
+      providers,
+      activeProviderId:
+        llmSettings.activeProviderId === id
+          ? providers[0]?.id ?? ""
+          : llmSettings.activeProviderId
+    })
   }
 
   const updateQuickTheme = (index: number, themeId: string) => {
@@ -190,6 +257,13 @@ function OptionsPage() {
     const next = [...rules]
     ;[next[index], next[target]] = [next[target], next[index]]
     persistRules(next)
+  }
+
+  const confirmLayout = (rule: UrlRule) => {
+    if (!rule.layout) return
+    updateRule(rule.id, {
+      layout: { ...rule.layout, status: "confirmed", updatedAt: Date.now() }
+    })
   }
 
   return (
@@ -420,6 +494,142 @@ function OptionsPage() {
         </div>
       </section>
 
+      <section className="workspace-section ai-section">
+        <div className="section-heading">
+          <div>
+            <span>AI PROVIDERS</span>
+            <h2>页面分析模型</h2>
+          </div>
+          <label className="ai-master-switch">
+            <input
+              type="checkbox"
+              checked={llmSettings.enabled}
+              onChange={(event) =>
+                persistLlmSettings({
+                  ...llmSettings,
+                  enabled: event.target.checked
+                })
+              }
+            />
+            <i aria-hidden="true" />
+            <span>{llmSettings.enabled ? "已启用" : "未启用"}</span>
+          </label>
+        </div>
+        <div className="ai-toolbar">
+          <label>
+            <span>当前供应商</span>
+            <select
+              value={llmSettings.activeProviderId}
+              onChange={(event) =>
+                persistLlmSettings({
+                  ...llmSettings,
+                  activeProviderId: event.target.value
+                })
+              }>
+              {llmSettings.providers.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div>
+            <button onClick={() => addProvider("openai-compatible")}>
+              ＋ OpenAI-compatible
+            </button>
+            <button onClick={() => addProvider("anthropic")}>
+              ＋ Anthropic
+            </button>
+          </div>
+        </div>
+        <div className="provider-list">
+          {llmSettings.providers.map((provider) => (
+            <article
+              className={
+                provider.id === llmSettings.activeProviderId
+                  ? "provider-card active"
+                  : "provider-card"
+              }
+              key={provider.id}>
+              <header>
+                <b>
+                  {provider.type === "anthropic"
+                    ? "ANTHROPIC MESSAGES"
+                    : "OPENAI CHAT COMPLETIONS"}
+                </b>
+                <button onClick={() => deleteProvider(provider.id)}>
+                  删除
+                </button>
+              </header>
+              <div className="provider-fields">
+                <label>
+                  <span>名称</span>
+                  <input
+                    value={provider.name}
+                    onChange={(event) =>
+                      updateProvider(provider.id, { name: event.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  <span>协议</span>
+                  <select
+                    value={provider.type}
+                    onChange={(event) =>
+                      updateProvider(provider.id, {
+                        type: event.target.value as LlmProviderType
+                      })
+                    }>
+                    <option value="openai-compatible">OpenAI-compatible</option>
+                    <option value="anthropic">Anthropic</option>
+                  </select>
+                </label>
+                <label className="provider-url">
+                  <span>Base URL</span>
+                  <input
+                    value={provider.baseUrl}
+                    placeholder="https://api.example.com/v1"
+                    onChange={(event) =>
+                      updateProvider(provider.id, {
+                        baseUrl: event.target.value
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  <span>模型名称</span>
+                  <input
+                    value={provider.model}
+                    placeholder="填写供应商提供的模型 ID"
+                    onChange={(event) =>
+                      updateProvider(provider.id, { model: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="provider-key">
+                  <span>API Key</span>
+                  <input
+                    type="password"
+                    value={provider.apiKey}
+                    autoComplete="off"
+                    placeholder="仅保存在浏览器本地存储"
+                    onChange={(event) =>
+                      updateProvider(provider.id, {
+                        apiKey: event.target.value
+                      })
+                    }
+                  />
+                </label>
+              </div>
+            </article>
+          ))}
+        </div>
+        <p className="ai-safety-note">
+          API Key 保存在扩展的本地存储中，但不会被加密。AI
+          仅接收当前页面的结构摘要，不发送正文、表单值或 Cookie。
+        </p>
+      </section>
+
       <section className="workspace-section rules-section">
         <div className="section-heading">
           <div>
@@ -609,8 +819,12 @@ function OptionsPage() {
                             <option value="single-column">单栏重排</option>
                           </select>
                         </label>
-                        <button disabled title="LLM 接口将在下一阶段接入">
-                          使用 AI 分析（可选）
+                        <button
+                          disabled={rule.layout?.status !== "draft"}
+                          onClick={() => confirmLayout(rule)}>
+                          {rule.layout?.status === "draft"
+                            ? "确认并应用草稿"
+                            : "规则已确认"}
                         </button>
                       </div>
                       <div className="region-selector-grid">
@@ -635,8 +849,8 @@ function OptionsPage() {
                         ))}
                       </div>
                       <p>
-                        从 Popup
-                        点击“分析并保存当前网站布局”可自动生成；手动修改后将标记为已确认规则。
+                        从 Popup 使用本地或 AI 分析生成规则；AI
+                        结果会先保存为草稿，确认后才会应用。
                       </p>
                     </div>
                   </details>
