@@ -6,19 +6,24 @@ import {
   createDomSummary
 } from "~lib/layout"
 import {
+  ACTIVE_SHARE_TEMPLATE_STORAGE_KEY,
   EXTENSION_ENABLED_STORAGE_KEY,
   findMatchingRule,
+  readActiveShareTemplateId,
   readExtensionEnabled,
   readRules,
   readSettings,
+  readShareTemplates,
   readThemes,
   resolveSettings,
   RULES_STORAGE_KEY,
+  SHARE_TEMPLATES_STORAGE_KEY,
   STORAGE_KEY,
   THEMES_STORAGE_KEY,
   writeRules,
   type EasyReadSettings,
   type LayoutRegion,
+  type ShareCardTemplate,
   type SiteLayoutRule,
   type UrlRule
 } from "~lib/settings"
@@ -39,6 +44,7 @@ const PREVIEW_CLASS = "easy-read-layout-previewing"
 const SHARE_HOST_ID = "easy-read-share-selection"
 
 let currentSettings: EasyReadSettings | null = null
+let currentShareTemplate: ShareCardTemplate | null = null
 let sharingEnabled = false
 
 const REGION_LABELS: Record<LayoutRegion, string> = {
@@ -189,11 +195,20 @@ function applyLayoutRule(rule = analyzeDocument()) {
 }
 
 async function refreshSettings() {
-  const [settings, rules, themes, extensionEnabled] = await Promise.all([
+  const [
+    settings,
+    rules,
+    themes,
+    extensionEnabled,
+    shareTemplates,
+    activeShareTemplateId
+  ] = await Promise.all([
     readSettings(),
     readRules(),
     readThemes(),
-    readExtensionEnabled()
+    readExtensionEnabled(),
+    readShareTemplates(),
+    readActiveShareTemplateId()
   ])
   const rule = findMatchingRule(location.href, rules)
   const resolvedSettings = resolveSettings(
@@ -203,6 +218,9 @@ async function refreshSettings() {
     themes
   )
   currentSettings = resolvedSettings
+  currentShareTemplate =
+    shareTemplates.find((template) => template.id === activeShareTemplateId) ??
+    shareTemplates[0]
   sharingEnabled = extensionEnabled
   if (!sharingEnabled) clearShareAction()
   if (extensionEnabled && resolvedSettings.mode !== "native") {
@@ -247,6 +265,7 @@ function showShareAction() {
   if (
     !sharingEnabled ||
     !currentSettings ||
+    !currentShareTemplate ||
     document.getElementById(PREVIEW_HOST_ID)
   )
     return
@@ -280,7 +299,12 @@ function showShareAction() {
     button.disabled = true
     button.textContent = "正在生成图片…"
     try {
-      await copyShareCard(text, currentSettings!, location.hostname)
+      await copyShareCard(
+        text,
+        currentSettings!,
+        currentShareTemplate!,
+        location.hostname
+      )
       button.textContent = "图片已复制"
       window.setTimeout(clearShareAction, 1200)
     } catch (error) {
@@ -532,6 +556,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     (changes[STORAGE_KEY] ||
       changes[RULES_STORAGE_KEY] ||
       changes[THEMES_STORAGE_KEY] ||
+      changes[SHARE_TEMPLATES_STORAGE_KEY] ||
+      changes[ACTIVE_SHARE_TEMPLATE_STORAGE_KEY] ||
       changes[EXTENSION_ENABLED_STORAGE_KEY])
   ) {
     if (!document.getElementById(PREVIEW_HOST_ID)) void refreshSettings()

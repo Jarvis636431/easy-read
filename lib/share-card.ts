@@ -1,4 +1,4 @@
-import type { EasyReadSettings } from "~lib/settings"
+import type { EasyReadSettings, ShareCardTemplate } from "~lib/settings"
 
 const CARD_WIDTH = 1080
 const HORIZONTAL_PADDING = 96
@@ -74,6 +74,7 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
 export async function createShareCard(
   selectedText: string,
   settings: EasyReadSettings,
+  template: ShareCardTemplate,
   source: string
 ) {
   const text = selectedText.trim().slice(0, MAX_TEXT_LENGTH)
@@ -83,9 +84,26 @@ export async function createShareCard(
   const context = canvas.getContext("2d")
   if (!context) throw new Error("当前浏览器不支持 Canvas")
 
-  const fontSize = text.length > 300 ? 38 : text.length > 150 ? 44 : 50
+  const colors = template.followTheme
+    ? {
+        page: settings.pageColor,
+        card: settings.contentColor,
+        text: settings.textColor,
+        accent: settings.linkColor
+      }
+    : {
+        page: template.pageColor,
+        card: template.cardColor,
+        text: template.textColor,
+        accent: template.accentColor
+      }
+  const fontFamily = template.followTheme
+    ? settings.fontFamily
+    : template.fontFamily
+  const baseFontSize = text.length > 300 ? 38 : text.length > 150 ? 44 : 50
+  const fontSize = Math.round(baseFontSize * template.fontScale)
   const lineHeight = Math.round(fontSize * 1.58)
-  context.font = `600 ${fontSize}px ${canvasFontFamily(settings.fontFamily)}`
+  context.font = `600 ${fontSize}px ${canvasFontFamily(fontFamily)}`
   const lines = wrapText(
     context,
     text,
@@ -96,10 +114,10 @@ export async function createShareCard(
   canvas.width = CARD_WIDTH
   canvas.height = cardHeight
 
-  context.fillStyle = settings.pageColor
+  context.fillStyle = colors.page
   context.fillRect(0, 0, canvas.width, canvas.height)
 
-  context.fillStyle = alpha(settings.linkColor, 0.12)
+  context.fillStyle = alpha(colors.accent, 0.12)
   context.beginPath()
   context.arc(CARD_WIDTH - 62, 74, 210, 0, Math.PI * 2)
   context.fill()
@@ -108,42 +126,53 @@ export async function createShareCard(
   const cardY = 58
   const cardWidth = CARD_WIDTH - 116
   const innerHeight = cardHeight - 116
-  context.shadowColor = alpha(settings.textColor, 0.15)
+  context.shadowColor = alpha(colors.text, 0.15)
   context.shadowBlur = 30
   context.shadowOffsetY = 12
-  context.fillStyle = settings.contentColor
-  roundedRect(context, cardX, cardY, cardWidth, innerHeight, 18)
+  context.fillStyle = colors.card
+  roundedRect(
+    context,
+    cardX,
+    cardY,
+    cardWidth,
+    innerHeight,
+    template.cornerRadius
+  )
   context.fill()
   context.shadowColor = "transparent"
 
-  context.fillStyle = settings.linkColor
+  context.fillStyle = colors.accent
   roundedRect(context, cardX, cardY, 12, innerHeight, 6)
   context.fill()
 
-  context.fillStyle = alpha(settings.textColor, 0.16)
-  context.font = `700 116px ${canvasFontFamily(settings.headingFontFamily)}`
+  context.fillStyle = alpha(colors.text, 0.16)
+  context.font = `700 116px ${canvasFontFamily(fontFamily)}`
   context.fillText("“", 102, 184)
 
-  context.fillStyle = settings.textColor
-  context.font = `600 ${fontSize}px ${canvasFontFamily(settings.fontFamily)}`
+  context.fillStyle = colors.text
+  context.font = `600 ${fontSize}px ${canvasFontFamily(fontFamily)}`
   context.textBaseline = "top"
   lines.forEach((line, index) => {
     context.fillText(line, HORIZONTAL_PADDING + 24, 210 + index * lineHeight)
   })
 
   const footerY = cardHeight - 138
-  context.fillStyle = alpha(settings.textColor, 0.16)
+  context.fillStyle = alpha(colors.text, 0.16)
   context.fillRect(HORIZONTAL_PADDING + 24, footerY - 28, 840, 2)
 
   context.textBaseline = "alphabetic"
-  context.fillStyle = alpha(settings.textColor, 0.62)
-  context.font = `500 24px ${canvasFontFamily(settings.fontFamily)}`
-  context.fillText(source, HORIZONTAL_PADDING + 24, footerY + 18)
+  if (template.showSource) {
+    context.fillStyle = alpha(colors.text, 0.62)
+    context.font = `500 24px ${canvasFontFamily(fontFamily)}`
+    context.fillText(source, HORIZONTAL_PADDING + 24, footerY + 18)
+  }
 
-  context.textAlign = "right"
-  context.fillStyle = settings.linkColor
-  context.font = "700 22px ui-monospace, SFMono-Regular, Menlo, monospace"
-  context.fillText("EASY READ", CARD_WIDTH - HORIZONTAL_PADDING, footerY + 18)
+  if (template.showBranding) {
+    context.textAlign = "right"
+    context.fillStyle = colors.accent
+    context.font = "700 22px ui-monospace, SFMono-Regular, Menlo, monospace"
+    context.fillText("EASY READ", CARD_WIDTH - HORIZONTAL_PADDING, footerY + 18)
+  }
 
   return canvasToBlob(canvas)
 }
@@ -151,11 +180,12 @@ export async function createShareCard(
 export async function copyShareCard(
   selectedText: string,
   settings: EasyReadSettings,
+  template: ShareCardTemplate,
   source: string
 ) {
   if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
     throw new Error("当前浏览器不支持复制图片")
   }
-  const blob = await createShareCard(selectedText, settings, source)
+  const blob = await createShareCard(selectedText, settings, template, source)
   await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
 }

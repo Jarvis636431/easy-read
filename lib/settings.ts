@@ -25,6 +25,8 @@ export const QUICK_THEMES_STORAGE_KEY = "easyReadQuickThemeIds"
 export const ACTIVE_THEME_STORAGE_KEY = "easyReadActiveThemeId"
 export const EXTENSION_ENABLED_STORAGE_KEY = "easyReadExtensionEnabled"
 export const LLM_SETTINGS_STORAGE_KEY = "easyReadLlmSettings"
+export const SHARE_TEMPLATES_STORAGE_KEY = "easyReadShareTemplates"
+export const ACTIVE_SHARE_TEMPLATE_STORAGE_KEY = "easyReadActiveShareTemplateId"
 export const defaultQuickThemeIds = [
   "native",
   "comfortable",
@@ -38,6 +40,55 @@ export type ReadingTheme = {
   builtin: boolean
   settings: EasyReadSettings
 }
+
+export type ShareCardTemplate = {
+  id: string
+  name: string
+  builtin: boolean
+  followTheme: boolean
+  pageColor: string
+  cardColor: string
+  textColor: string
+  accentColor: string
+  fontFamily: string
+  fontScale: number
+  cornerRadius: number
+  showSource: boolean
+  showBranding: boolean
+}
+
+export const builtinShareTemplates: ShareCardTemplate[] = [
+  {
+    id: "theme-spine",
+    name: "主题书脊",
+    builtin: true,
+    followTheme: true,
+    pageColor: "#f3f0e7",
+    cardColor: "#fbfaf5",
+    textColor: "#2b3437",
+    accentColor: "#176b78",
+    fontFamily: '"Helvetica Neue", Arial, "PingFang SC", sans-serif',
+    fontScale: 1,
+    cornerRadius: 18,
+    showSource: true,
+    showBranding: true
+  },
+  {
+    id: "midnight-note",
+    name: "午夜摘录",
+    builtin: true,
+    followTheme: false,
+    pageColor: "#101820",
+    cardColor: "#18252e",
+    textColor: "#e7ecee",
+    accentColor: "#e6a15c",
+    fontFamily: 'Georgia, "Songti SC", serif',
+    fontScale: 1.04,
+    cornerRadius: 8,
+    showSource: true,
+    showBranding: true
+  }
+]
 
 export type LayoutRuleSource = "local" | "llm" | "manual"
 export type PageType =
@@ -327,6 +378,37 @@ export async function readLlmSettings(): Promise<LlmSettings> {
 
 export async function writeLlmSettings(settings: LlmSettings) {
   await chrome.storage.local.set({ [LLM_SETTINGS_STORAGE_KEY]: settings })
+}
+
+export async function readShareTemplates(): Promise<ShareCardTemplate[]> {
+  const result = await chrome.storage.local.get(SHARE_TEMPLATES_STORAGE_KEY)
+  const custom = Array.isArray(result[SHARE_TEMPLATES_STORAGE_KEY])
+    ? result[SHARE_TEMPLATES_STORAGE_KEY]
+    : []
+  return [...builtinShareTemplates, ...custom]
+}
+
+export async function writeCustomShareTemplates(
+  templates: ShareCardTemplate[]
+) {
+  await chrome.storage.local.set({
+    [SHARE_TEMPLATES_STORAGE_KEY]: templates.filter(
+      (template) => !template.builtin
+    )
+  })
+}
+
+export async function readActiveShareTemplateId(): Promise<string> {
+  const result = await chrome.storage.local.get(
+    ACTIVE_SHARE_TEMPLATE_STORAGE_KEY
+  )
+  return result[ACTIVE_SHARE_TEMPLATE_STORAGE_KEY] ?? "theme-spine"
+}
+
+export async function writeActiveShareTemplateId(templateId: string) {
+  await chrome.storage.local.set({
+    [ACTIVE_SHARE_TEMPLATE_STORAGE_KEY]: templateId
+  })
 }
 
 export function matchesUrl(pattern: string, url: string) {

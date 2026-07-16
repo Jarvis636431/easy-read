@@ -296,6 +296,218 @@ button {
   padding-top: 30px;
   border-top: 1px solid #becac9;
 }
+.share-template-section {
+  margin-top: 42px;
+  padding-top: 30px;
+  border-top: 1px solid #becac9;
+}
+.share-template-workbench {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  overflow: hidden;
+  border: 1px solid #c7d3d1;
+  border-radius: 5px;
+  background: #f8faf8;
+  box-shadow: 0 8px 28px #1830390b;
+}
+.share-template-list {
+  padding: 12px;
+  border-right: 1px solid #d5dfdd;
+  background: #eef3f1;
+}
+.share-template-item {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px;
+  color: #2f474c;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+}
+.share-template-item + .share-template-item {
+  margin-top: 4px;
+}
+.share-template-item.active {
+  border-color: #8daead;
+  background: white;
+}
+.share-template-item > i {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #18303920;
+  border-radius: 3px;
+}
+.share-template-item > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.share-template-item strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.share-template-item small {
+  color: #819092;
+  font-size: 9px;
+}
+.share-template-editor {
+  min-width: 0;
+  padding: 20px 22px 22px;
+}
+.share-template-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+.share-template-toolbar > div:first-child {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+}
+.share-template-toolbar label,
+.share-template-fields label > span {
+  color: #718184;
+  font-size: 9px;
+  font-weight: 700;
+}
+.share-template-toolbar input {
+  width: min(330px, 100%);
+  padding: 3px 0;
+  color: #183039;
+  font-family: "Songti SC", Georgia, serif;
+  font-size: 20px;
+  font-weight: 700;
+  border: 0;
+  border-bottom: 1px solid #b9cac7;
+  background: transparent;
+}
+.share-template-toolbar input:disabled {
+  border-color: transparent;
+}
+.share-template-toolbar > div:last-child {
+  display: flex;
+  gap: 6px;
+}
+.share-template-toolbar button {
+  padding: 7px 9px;
+  color: #286c73;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid #a9c0be;
+  border-radius: 3px;
+  background: white;
+}
+.share-template-toolbar .use-template {
+  color: white;
+  border-color: #287781;
+  background: #287781;
+}
+.share-template-toolbar .danger {
+  color: #9a4d48;
+  border-color: #d8b9b5;
+}
+.share-card-preview {
+  display: grid;
+  place-items: center;
+  min-height: 270px;
+  margin: 16px 0;
+  padding: 28px;
+  overflow: hidden;
+  border: 1px solid #ccd7d5;
+  border-radius: 4px;
+}
+.share-card-preview article {
+  width: min(100%, 430px);
+  padding: 25px 27px 20px;
+  border-left: 6px solid;
+  box-shadow: 0 10px 30px #172f3526;
+}
+.share-card-preview article > b {
+  display: block;
+  height: 25px;
+  font:
+    700 48px/1 Georgia,
+    serif;
+  opacity: 0.28;
+}
+.share-card-preview p {
+  margin: 13px 0 25px;
+  font-weight: 600;
+  line-height: 1.65;
+}
+.share-card-preview footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 12px;
+  font-size: 8px;
+  border-top: 1px solid currentColor;
+  opacity: 0.72;
+}
+.share-card-preview footer strong {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.08em;
+}
+.share-template-fields {
+  padding: 0;
+  border: 0;
+}
+.share-template-fields legend {
+  margin-bottom: 10px;
+  color: #64777a;
+  font-size: 10px;
+  font-weight: 700;
+}
+.share-template-fields:disabled {
+  opacity: 0.5;
+}
+.share-template-switches {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 13px;
+  color: #52686c;
+  font-size: 10px;
+}
+.share-template-switches input {
+  accent-color: #287781;
+}
+.share-template-colors {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+}
+.share-template-colors.theme-linked {
+  opacity: 0.38;
+  pointer-events: none;
+}
+.share-template-parameters {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px;
+  gap: 9px;
+  margin-top: 12px;
+}
+.share-template-parameters > label {
+  display: grid;
+  gap: 5px;
+}
+.share-template-parameters > label:first-child input {
+  height: 36px;
+  padding: 0 9px;
+  color: #284348;
+  font:
+    10px/1.2 "SFMono-Regular",
+    Consolas,
+    monospace;
+  border: 1px solid #ccd7d5;
+  border-radius: 3px;
+  background: white;
+}
 .ai-master-switch {
   display: flex;
   align-items: center;
@@ -1038,6 +1250,33 @@ button:focus-visible {
   }
   .theme-workbench {
     grid-template-columns: 1fr;
+  }
+  .share-template-workbench {
+    grid-template-columns: 1fr;
+  }
+  .share-template-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-right: 0;
+    border-bottom: 1px solid #d5dfdd;
+  }
+  .share-template-item + .share-template-item {
+    margin-top: 0;
+  }
+  .share-template-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .share-template-colors {
+    grid-template-columns: 1fr 1fr;
+  }
+  .share-template-parameters {
+    grid-template-columns: 1fr;
+  }
+  .share-template-switches {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
   .theme-list {
     display: grid;

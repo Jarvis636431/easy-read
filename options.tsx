@@ -3,13 +3,18 @@ import { useEffect, useMemo, useState } from "react"
 import "./options.css"
 
 import {
+  builtinShareTemplates,
   builtinThemes,
   defaultLlmSettings,
+  readActiveShareTemplateId,
   readLlmSettings,
   readNetworkBlocking,
   readQuickThemeIds,
   readRules,
+  readShareTemplates,
   readThemes,
+  writeActiveShareTemplateId,
+  writeCustomShareTemplates,
   writeCustomThemes,
   writeLlmSettings,
   writeNetworkBlocking,
@@ -23,6 +28,7 @@ import {
   type LlmSettings,
   type PageType,
   type ReadingTheme,
+  type ShareCardTemplate,
   type SiteLayoutRule,
   type UrlRule
 } from "~lib/settings"
@@ -84,6 +90,17 @@ function createProvider(type: LlmProviderType): LlmProvider {
   }
 }
 
+function createShareTemplate(
+  source: ShareCardTemplate = builtinShareTemplates[0]
+): ShareCardTemplate {
+  return {
+    ...source,
+    id: crypto.randomUUID(),
+    name: `${source.name}副本`,
+    builtin: false
+  }
+}
+
 function OptionsPage() {
   const [themes, setThemes] = useState<ReadingTheme[]>(builtinThemes)
   const [rules, setRules] = useState<UrlRule[]>([])
@@ -93,6 +110,13 @@ function OptionsPage() {
   const [quickThemeIds, setQuickThemeIds] = useState<string[]>([])
   const [llmSettings, setLlmSettings] =
     useState<LlmSettings>(defaultLlmSettings)
+  const [shareTemplates, setShareTemplates] = useState<ShareCardTemplate[]>(
+    builtinShareTemplates
+  )
+  const [activeShareTemplateId, setActiveShareTemplateId] =
+    useState("theme-spine")
+  const [selectedShareTemplateId, setSelectedShareTemplateId] =
+    useState("theme-spine")
 
   useEffect(() => {
     Promise.all([
@@ -100,20 +124,27 @@ function OptionsPage() {
       readRules(),
       readNetworkBlocking(),
       readQuickThemeIds(),
-      readLlmSettings()
+      readLlmSettings(),
+      readShareTemplates(),
+      readActiveShareTemplateId()
     ]).then(
       ([
         storedThemes,
         storedRules,
         storedNetworkBlocking,
         storedQuickIds,
-        storedLlmSettings
+        storedLlmSettings,
+        storedShareTemplates,
+        storedActiveShareTemplateId
       ]) => {
         setThemes(storedThemes)
         setRules(storedRules)
         setNetworkBlocking(storedNetworkBlocking)
         setQuickThemeIds(storedQuickIds)
         setLlmSettings(storedLlmSettings)
+        setShareTemplates(storedShareTemplates)
+        setActiveShareTemplateId(storedActiveShareTemplateId)
+        setSelectedShareTemplateId(storedActiveShareTemplateId)
       }
     )
   }, [])
@@ -121,6 +152,14 @@ function OptionsPage() {
   const selected = useMemo(
     () => themes.find((theme) => theme.id === selectedId) ?? themes[0],
     [selectedId, themes]
+  )
+
+  const selectedShareTemplate = useMemo(
+    () =>
+      shareTemplates.find(
+        (template) => template.id === selectedShareTemplateId
+      ) ?? shareTemplates[0],
+    [selectedShareTemplateId, shareTemplates]
   )
 
   const showSaved = () => {
@@ -141,6 +180,44 @@ function OptionsPage() {
   const persistLlmSettings = (next: LlmSettings) => {
     setLlmSettings(next)
     void writeLlmSettings(next).then(showSaved)
+  }
+
+  const persistShareTemplates = (next: ShareCardTemplate[]) => {
+    setShareTemplates(next)
+    void writeCustomShareTemplates(next).then(showSaved)
+  }
+
+  const updateShareTemplate = (patch: Partial<ShareCardTemplate>) => {
+    if (!selectedShareTemplate || selectedShareTemplate.builtin) return
+    persistShareTemplates(
+      shareTemplates.map((template) =>
+        template.id === selectedShareTemplate.id
+          ? { ...template, ...patch }
+          : template
+      )
+    )
+  }
+
+  const addShareTemplate = (source = selectedShareTemplate) => {
+    const template = createShareTemplate(source)
+    persistShareTemplates([...shareTemplates, template])
+    setSelectedShareTemplateId(template.id)
+  }
+
+  const activateShareTemplate = (templateId: string) => {
+    setActiveShareTemplateId(templateId)
+    void writeActiveShareTemplateId(templateId).then(showSaved)
+  }
+
+  const deleteShareTemplate = () => {
+    if (!selectedShareTemplate || selectedShareTemplate.builtin) return
+    const next = shareTemplates.filter(
+      (template) => template.id !== selectedShareTemplate.id
+    )
+    persistShareTemplates(next)
+    if (activeShareTemplateId === selectedShareTemplate.id)
+      activateShareTemplate("theme-spine")
+    setSelectedShareTemplateId("theme-spine")
   }
 
   const updateProvider = (id: string, patch: Partial<LlmProvider>) => {
@@ -265,6 +342,23 @@ function OptionsPage() {
       layout: { ...rule.layout, status: "confirmed", updatedAt: Date.now() }
     })
   }
+
+  const sharePreviewTheme = selected?.settings ?? builtinThemes[1].settings
+  const sharePreviewColors = selectedShareTemplate?.followTheme
+    ? {
+        page: sharePreviewTheme.pageColor,
+        card: sharePreviewTheme.contentColor,
+        text: sharePreviewTheme.textColor,
+        accent: sharePreviewTheme.linkColor,
+        font: sharePreviewTheme.fontFamily
+      }
+    : {
+        page: selectedShareTemplate?.pageColor ?? "#f3f0e7",
+        card: selectedShareTemplate?.cardColor ?? "#fbfaf5",
+        text: selectedShareTemplate?.textColor ?? "#2b3437",
+        accent: selectedShareTemplate?.accentColor ?? "#176b78",
+        font: selectedShareTemplate?.fontFamily ?? "sans-serif"
+      }
 
   return (
     <main className="options-shell">
@@ -491,6 +585,207 @@ function OptionsPage() {
               </label>
             )
           })}
+        </div>
+      </section>
+
+      <section className="workspace-section share-template-section">
+        <div className="section-heading">
+          <div>
+            <span>SHARE CARDS</span>
+            <h2>分享模板</h2>
+          </div>
+          <button
+            className="secondary-action"
+            onClick={() => addShareTemplate()}>
+            ＋ 新建模板
+          </button>
+        </div>
+        <div className="share-template-workbench">
+          <nav className="share-template-list" aria-label="分享模板列表">
+            {shareTemplates.map((template) => (
+              <button
+                className={
+                  template.id === selectedShareTemplate?.id
+                    ? "share-template-item active"
+                    : "share-template-item"
+                }
+                key={template.id}
+                onClick={() => setSelectedShareTemplateId(template.id)}>
+                <i
+                  style={{
+                    background: template.followTheme
+                      ? "linear-gradient(135deg, #f3f0e7 50%, #17212a 50%)"
+                      : `linear-gradient(135deg, ${template.pageColor} 50%, ${template.cardColor} 50%)`
+                  }}
+                />
+                <span>
+                  <strong>{template.name}</strong>
+                  <small>
+                    {template.id === activeShareTemplateId
+                      ? "正在使用"
+                      : template.builtin
+                        ? "内置模板"
+                        : "自定义模板"}
+                  </small>
+                </span>
+              </button>
+            ))}
+          </nav>
+          {selectedShareTemplate && (
+            <div className="share-template-editor">
+              <div className="share-template-toolbar">
+                <div>
+                  <label>模板名称</label>
+                  <input
+                    value={selectedShareTemplate.name}
+                    disabled={selectedShareTemplate.builtin}
+                    onChange={(event) =>
+                      updateShareTemplate({ name: event.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <button
+                    className="use-template"
+                    disabled={
+                      activeShareTemplateId === selectedShareTemplate.id
+                    }
+                    onClick={() =>
+                      activateShareTemplate(selectedShareTemplate.id)
+                    }>
+                    {activeShareTemplateId === selectedShareTemplate.id
+                      ? "正在使用"
+                      : "设为当前模板"}
+                  </button>
+                  <button
+                    onClick={() => addShareTemplate(selectedShareTemplate)}>
+                    复制
+                  </button>
+                  {!selectedShareTemplate.builtin && (
+                    <button className="danger" onClick={deleteShareTemplate}>
+                      删除
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div
+                className="share-card-preview"
+                style={{ background: sharePreviewColors.page }}>
+                <article
+                  style={{
+                    color: sharePreviewColors.text,
+                    background: sharePreviewColors.card,
+                    borderLeftColor: sharePreviewColors.accent,
+                    borderRadius: selectedShareTemplate.cornerRadius / 2,
+                    fontFamily: sharePreviewColors.font
+                  }}>
+                  <b style={{ color: sharePreviewColors.accent }}>“</b>
+                  <p
+                    style={{
+                      fontSize: `${14 * selectedShareTemplate.fontScale}px`
+                    }}>
+                    阅读不是把页面变得更复杂，而是把注意力重新交还给文字。
+                  </p>
+                  <footer>
+                    <span>
+                      {selectedShareTemplate.showSource ? "example.com" : ""}
+                    </span>
+                    <strong style={{ color: sharePreviewColors.accent }}>
+                      {selectedShareTemplate.showBranding ? "EASY READ" : ""}
+                    </strong>
+                  </footer>
+                </article>
+              </div>
+              <fieldset
+                className="share-template-fields"
+                disabled={selectedShareTemplate.builtin}>
+                <legend>
+                  {selectedShareTemplate.builtin
+                    ? "复制此模板后即可编辑"
+                    : "模板参数"}
+                </legend>
+                <div className="share-template-switches">
+                  <CheckField
+                    label="跟随当前阅读主题"
+                    checked={selectedShareTemplate.followTheme}
+                    onChange={(followTheme) =>
+                      updateShareTemplate({ followTheme })
+                    }
+                  />
+                  <CheckField
+                    label="显示来源"
+                    checked={selectedShareTemplate.showSource}
+                    onChange={(showSource) =>
+                      updateShareTemplate({ showSource })
+                    }
+                  />
+                  <CheckField
+                    label="显示 Easy Read"
+                    checked={selectedShareTemplate.showBranding}
+                    onChange={(showBranding) =>
+                      updateShareTemplate({ showBranding })
+                    }
+                  />
+                </div>
+                <div
+                  className={
+                    selectedShareTemplate.followTheme
+                      ? "share-template-colors theme-linked"
+                      : "share-template-colors"
+                  }>
+                  <ColorField
+                    label="画布背景"
+                    value={selectedShareTemplate.pageColor}
+                    onChange={(pageColor) => updateShareTemplate({ pageColor })}
+                  />
+                  <ColorField
+                    label="卡片背景"
+                    value={selectedShareTemplate.cardColor}
+                    onChange={(cardColor) => updateShareTemplate({ cardColor })}
+                  />
+                  <ColorField
+                    label="文字颜色"
+                    value={selectedShareTemplate.textColor}
+                    onChange={(textColor) => updateShareTemplate({ textColor })}
+                  />
+                  <ColorField
+                    label="强调颜色"
+                    value={selectedShareTemplate.accentColor}
+                    onChange={(accentColor) =>
+                      updateShareTemplate({ accentColor })
+                    }
+                  />
+                </div>
+                <div className="share-template-parameters">
+                  <TextField
+                    label="字体栈"
+                    value={selectedShareTemplate.fontFamily}
+                    onChange={(fontFamily) =>
+                      updateShareTemplate({ fontFamily })
+                    }
+                  />
+                  <NumberField
+                    label="字号比例"
+                    value={selectedShareTemplate.fontScale}
+                    min={0.75}
+                    max={1.35}
+                    step={0.05}
+                    onChange={(fontScale) => updateShareTemplate({ fontScale })}
+                  />
+                  <NumberField
+                    label="卡片圆角"
+                    value={selectedShareTemplate.cornerRadius}
+                    min={0}
+                    max={40}
+                    suffix="px"
+                    onChange={(cornerRadius) =>
+                      updateShareTemplate({ cornerRadius })
+                    }
+                  />
+                </div>
+              </fieldset>
+            </div>
+          )}
         </div>
       </section>
 
