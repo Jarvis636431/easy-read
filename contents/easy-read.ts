@@ -22,6 +22,7 @@ import {
   type SiteLayoutRule,
   type UrlRule
 } from "~lib/settings"
+import { copyShareCard } from "~lib/share-card"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -35,6 +36,10 @@ const LAYOUT_ATTRIBUTE = "data-easy-read-layout"
 const PREVIEW_HOST_ID = "easy-read-layout-preview"
 const PREVIEW_STYLE_ID = "easy-read-layout-preview-styles"
 const PREVIEW_CLASS = "easy-read-layout-previewing"
+const SHARE_HOST_ID = "easy-read-share-selection"
+
+let currentSettings: EasyReadSettings | null = null
+let sharingEnabled = false
 
 const REGION_LABELS: Record<LayoutRegion, string> = {
   header: "页头",
@@ -197,6 +202,9 @@ async function refreshSettings() {
     rules,
     themes
   )
+  currentSettings = resolvedSettings
+  sharingEnabled = extensionEnabled
+  if (!sharingEnabled) clearShareAction()
   if (extensionEnabled && resolvedSettings.mode !== "native") {
     const savedLayout = rule?.layout
     const savedHealth = checkLayoutHealth(savedLayout)
@@ -214,6 +222,97 @@ async function refreshSettings() {
     extensionEnabled
   )
 }
+
+function clearShareAction() {
+  document.getElementById(SHARE_HOST_ID)?.remove()
+}
+
+function selectionRect(selection: Selection) {
+  if (!selection.rangeCount) return null
+  const range = selection.getRangeAt(0)
+  const rect = range.getBoundingClientRect()
+  if (rect.width || rect.height) return rect
+  return range.getClientRects()[0] ?? null
+}
+
+function selectionIsEditable(selection: Selection) {
+  const node = selection.anchorNode
+  const element =
+    node instanceof Element ? node : node?.parentElement ?? undefined
+  return Boolean(element?.closest("input, textarea, [contenteditable='true']"))
+}
+
+function showShareAction() {
+  clearShareAction()
+  if (
+    !sharingEnabled ||
+    !currentSettings ||
+    document.getElementById(PREVIEW_HOST_ID)
+  )
+    return
+  const selection = getSelection()
+  const text = selection?.toString().replace(/\s+/g, " ").trim() ?? ""
+  if (!selection || text.length < 2 || selectionIsEditable(selection)) return
+  const rect = selectionRect(selection)
+  if (!rect) return
+
+  const host = document.createElement("div")
+  host.id = SHARE_HOST_ID
+  host.style.position = "fixed"
+  host.style.zIndex = "2147483646"
+  host.style.left = `${Math.max(10, Math.min(innerWidth - 154, rect.left + rect.width / 2 - 72))}px`
+  host.style.top = `${Math.max(10, rect.top - 46)}px`
+  const shadow = host.attachShadow({ mode: "closed" })
+  shadow.innerHTML = `
+    <style>
+      :host { all: initial; }
+      button { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 12px; color: #f7faf8; font: 700 11px/1 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; cursor: pointer; border: 1px solid #45696d; border-radius: 5px; background: #183039; box-shadow: 0 8px 24px #102a3040; }
+      button::before { content: "◫"; color: #8fc4c6; font-size: 15px; }
+      button:hover { background: #22515a; }
+      button:disabled { cursor: default; opacity: .88; }
+      button:focus-visible { outline: 2px solid #e29656; outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+    </style>
+    <button type="button">复制分享卡片</button>`
+  const button = shadow.querySelector("button")!
+  button.addEventListener("pointerdown", (event) => event.preventDefault())
+  button.addEventListener("click", async () => {
+    button.disabled = true
+    button.textContent = "正在生成图片…"
+    try {
+      await copyShareCard(text, currentSettings!, location.hostname)
+      button.textContent = "图片已复制"
+      window.setTimeout(clearShareAction, 1200)
+    } catch (error) {
+      button.disabled = false
+      button.textContent =
+        error instanceof Error ? error.message : "复制失败，请重试"
+    }
+  })
+  document.documentElement.appendChild(host)
+}
+
+document.addEventListener("mouseup", (event) => {
+  if (
+    event
+      .composedPath()
+      .some((node) => node === document.getElementById(SHARE_HOST_ID))
+  )
+    return
+  window.setTimeout(showShareAction)
+})
+document.addEventListener("keyup", (event) => {
+  if (event.key === "Shift" || event.key.startsWith("Arrow")) {
+    window.setTimeout(showShareAction)
+  }
+})
+document.addEventListener(
+  "scroll",
+  () => {
+    clearShareAction()
+  },
+  { passive: true }
+)
 
 function installPreviewHighlights(rule: SiteLayoutRule) {
   document.getElementById(PREVIEW_STYLE_ID)?.remove()
@@ -257,6 +356,7 @@ async function saveConfirmedPreview(rule: SiteLayoutRule, themeId: string) {
 
 async function previewLayout(rule: SiteLayoutRule, themeId: string) {
   clearPreviewUi()
+  clearShareAction()
   const health = checkLayoutHealth(rule)
   if (!health.valid) throw new Error("AI 规则未通过当前页面校验")
   const [settings, rules, themes] = await Promise.all([
