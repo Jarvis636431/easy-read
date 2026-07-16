@@ -180,13 +180,14 @@ function IndexPopup() {
       })) as { ok: boolean; layout?: SiteLayoutRule; error?: string }
       if (!response.ok || !response.layout)
         throw new Error(response.error ?? "AI 分析失败")
-      const validation = (await chrome.tabs.sendMessage(site.tabId, {
-        type: "easy-read:validate-layout",
-        layout: response.layout
-      })) as { health: { valid: boolean; score: number } }
-      if (!validation.health.valid) throw new Error("AI 规则未通过当前页面校验")
-      await saveLayout(response.layout)
-      setLayoutStatus("AI 草稿已保存，请到设置页确认")
+      setLayoutStatus("正在网页中打开预览…")
+      const preview = (await chrome.tabs.sendMessage(site.tabId, {
+        type: "easy-read:preview-layout",
+        layout: response.layout,
+        themeId: activeThemeId
+      })) as { ok: boolean; error?: string }
+      if (!preview.ok) throw new Error(preview.error ?? "无法打开规则预览")
+      setLayoutStatus("预览已打开，请在网页中确认")
     } catch (error) {
       setLayoutStatus(error instanceof Error ? error.message : "AI 分析失败")
     } finally {

@@ -16,7 +16,11 @@ import {
   RULES_STORAGE_KEY,
   STORAGE_KEY,
   THEMES_STORAGE_KEY,
-  type EasyReadSettings
+  writeRules,
+  type EasyReadSettings,
+  type LayoutRegion,
+  type SiteLayoutRule,
+  type UrlRule
 } from "~lib/settings"
 
 export const config: PlasmoCSConfig = {
@@ -28,6 +32,27 @@ const STYLE_ID = "easy-read-page-styles"
 const ROOT_CLASS = "easy-read-active"
 const REGION_ATTRIBUTE = "data-easy-read-region"
 const LAYOUT_ATTRIBUTE = "data-easy-read-layout"
+const PREVIEW_HOST_ID = "easy-read-layout-preview"
+const PREVIEW_STYLE_ID = "easy-read-layout-preview-styles"
+const PREVIEW_CLASS = "easy-read-layout-previewing"
+
+const REGION_LABELS: Record<LayoutRegion, string> = {
+  header: "页头",
+  navigation: "导航",
+  content: "正文",
+  sidebar: "侧栏",
+  comments: "评论",
+  footer: "页脚"
+}
+
+const REGION_COLORS: Record<LayoutRegion, string> = {
+  header: "#547a91",
+  navigation: "#805da3",
+  content: "#168678",
+  sidebar: "#c27632",
+  comments: "#a34f6f",
+  footer: "#657078"
+}
 
 const AD_SELECTORS = [
   "ins.adsbygoogle",
@@ -134,6 +159,12 @@ function clearLayoutMarkers() {
   })
 }
 
+function clearPreviewUi() {
+  document.getElementById(PREVIEW_HOST_ID)?.remove()
+  document.getElementById(PREVIEW_STYLE_ID)?.remove()
+  document.documentElement.classList.remove(PREVIEW_CLASS)
+}
+
 function applyLayoutRule(rule = analyzeDocument()) {
   clearLayoutMarkers()
   const health = checkLayoutHealth(rule)
@@ -184,6 +215,161 @@ async function refreshSettings() {
   )
 }
 
+function installPreviewHighlights(rule: SiteLayoutRule) {
+  document.getElementById(PREVIEW_STYLE_ID)?.remove()
+  const style = document.createElement("style")
+  style.id = PREVIEW_STYLE_ID
+  style.textContent = Object.keys(rule.regions)
+    .map((region) => {
+      const color = REGION_COLORS[region as LayoutRegion]
+      return `html.${PREVIEW_CLASS} [${REGION_ATTRIBUTE}="${region}"] { outline: 3px solid ${color} !important; outline-offset: -3px !important; }`
+    })
+    .join("\n")
+  ;(document.head ?? document.documentElement).appendChild(style)
+  document.documentElement.classList.add(PREVIEW_CLASS)
+}
+
+async function saveConfirmedPreview(rule: SiteLayoutRule, themeId: string) {
+  const rules = await readRules()
+  const existing = findMatchingRule(location.href, rules)
+  const confirmed: SiteLayoutRule = {
+    ...rule,
+    status: "confirmed",
+    updatedAt: Date.now()
+  }
+  const nextRule: UrlRule = existing
+    ? { ...existing, layout: confirmed }
+    : {
+        id: crypto.randomUUID(),
+        name: `${location.hostname} 布局`,
+        pattern: `${location.hostname}/*`,
+        enabled: true,
+        themeId,
+        customHideSelectors: "",
+        layout: confirmed
+      }
+  await writeRules(
+    existing
+      ? rules.map((item) => (item.id === existing.id ? nextRule : item))
+      : [...rules, nextRule]
+  )
+}
+
+async function previewLayout(rule: SiteLayoutRule, themeId: string) {
+  clearPreviewUi()
+  const health = checkLayoutHealth(rule)
+  if (!health.valid) throw new Error("AI 规则未通过当前页面校验")
+  const [settings, rules, themes] = await Promise.all([
+    readSettings(),
+    readRules(),
+    readThemes()
+  ])
+  const matchedRule = findMatchingRule(location.href, rules)
+  const resolvedSettings = resolveSettings(
+    location.href,
+    settings,
+    rules,
+    themes
+  )
+  const previewSettings: EasyReadSettings = {
+    ...resolvedSettings,
+    mode:
+      resolvedSettings.mode === "native" ? "comfortable" : resolvedSettings.mode
+  }
+  const selectors = parseCustomSelectors(matchedRule?.customHideSelectors)
+
+  const showReflow = () => {
+    applySettings(previewSettings, selectors, true)
+    applyLayoutRule(rule)
+    installPreviewHighlights(rule)
+  }
+  const showOriginal = () => {
+    clearLayoutMarkers()
+    applySettings(resolvedSettings, selectors, false)
+    document.documentElement.classList.remove(PREVIEW_CLASS)
+  }
+
+  showReflow()
+  const host = document.createElement("div")
+  host.id = PREVIEW_HOST_ID
+  const shadow = host.attachShadow({ mode: "closed" })
+  const regions = (Object.keys(rule.regions) as LayoutRegion[])
+    .map(
+      (region) =>
+        `<span><i style="--region-color:${REGION_COLORS[region]}"></i>${REGION_LABELS[region]}</span>`
+    )
+    .join("")
+  shadow.innerHTML = `
+    <style>
+      :host { all: initial; }
+      * { box-sizing: border-box; }
+      aside { position: fixed; z-index: 2147483647; top: 18px; right: 18px; width: min(390px, calc(100vw - 36px)); color: #183039; font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; border: 1px solid #9eb4b2; border-radius: 6px; background: #f8faf8; box-shadow: 0 16px 50px #102a3040; }
+      header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #d5dfdd; background: #e8f0ed; }
+      header div { display: grid; gap: 2px; }
+      header b { font-size: 12px; }
+      header small { color: #64787a; font-size: 9px; }
+      header em { padding: 4px 6px; color: #24666d; font: 700 9px/1 ui-monospace, monospace; font-style: normal; border-radius: 2px; background: #d9e9e6; }
+      .body { padding: 12px 14px 14px; }
+      .regions { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 12px; }
+      .regions span { display: flex; align-items: center; gap: 4px; color: #607275; font-size: 9px; }
+      .regions i { width: 8px; height: 8px; border-radius: 2px; background: var(--region-color); }
+      .compare { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 4px; background: #e5ecea; }
+      button { min-height: 32px; padding: 0 10px; color: #38575b; font: 700 10px/1 inherit; cursor: pointer; border: 0; border-radius: 3px; background: transparent; }
+      .compare button.active { color: #1d656d; background: white; box-shadow: 0 1px 4px #1830391a; }
+      footer { display: flex; justify-content: flex-end; gap: 7px; margin-top: 12px; }
+      footer button { border: 1px solid #b8c9c7; background: white; }
+      footer .confirm { color: white; border-color: #287781; background: #287781; }
+      button:focus-visible { outline: 2px solid #e29656; outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+    </style>
+    <aside role="dialog" aria-label="AI 布局规则预览">
+      <header><div><b>AI 布局草稿</b><small>检查区域和重排效果后再保存</small></div><em>${Math.round(rule.confidence * 100)}%</em></header>
+      <div class="body">
+        <div class="regions">${regions}</div>
+        <div class="compare"><button data-view="original">原页面</button><button class="active" data-view="preview">重排预览</button></div>
+        <footer><button data-action="cancel">取消</button><button class="confirm" data-action="confirm">确认并应用</button></footer>
+      </div>
+    </aside>`
+  const originalButton = shadow.querySelector<HTMLButtonElement>(
+    '[data-view="original"]'
+  )!
+  const previewButton = shadow.querySelector<HTMLButtonElement>(
+    '[data-view="preview"]'
+  )!
+  originalButton.addEventListener("click", () => {
+    showOriginal()
+    originalButton.classList.add("active")
+    previewButton.classList.remove("active")
+  })
+  previewButton.addEventListener("click", () => {
+    showReflow()
+    previewButton.classList.add("active")
+    originalButton.classList.remove("active")
+  })
+  shadow
+    .querySelector('[data-action="cancel"]')
+    ?.addEventListener("click", () => {
+      clearPreviewUi()
+      void refreshSettings()
+    })
+  shadow
+    .querySelector<HTMLButtonElement>('[data-action="confirm"]')
+    ?.addEventListener("click", async (event) => {
+      const button = event.currentTarget as HTMLButtonElement
+      button.disabled = true
+      button.textContent = "正在保存…"
+      try {
+        await saveConfirmedPreview(rule, themeId)
+        clearPreviewUi()
+        await refreshSettings()
+      } catch {
+        button.disabled = false
+        button.textContent = "保存失败，请重试"
+      }
+    })
+  document.documentElement.appendChild(host)
+}
+
 function parseCustomSelectors(value = "") {
   return value
     .split("\n")
@@ -227,6 +413,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "easy-read:validate-layout") {
     sendResponse({ health: checkLayoutHealth(message.layout) })
   }
+  if (message?.type === "easy-read:preview-layout") {
+    void previewLayout(message.layout, message.themeId)
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) =>
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : "无法预览 AI 规则"
+        })
+      )
+    return true
+  }
 })
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -237,6 +434,6 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
       changes[THEMES_STORAGE_KEY] ||
       changes[EXTENSION_ENABLED_STORAGE_KEY])
   ) {
-    void refreshSettings()
+    if (!document.getElementById(PREVIEW_HOST_ID)) void refreshSettings()
   }
 })
