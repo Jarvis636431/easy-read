@@ -1,7 +1,7 @@
 import type { DomSummary } from "~lib/layout"
 import type {
   LayoutRegion,
-  LayoutStrategy,
+  LayoutTemplateId,
   LlmProvider,
   PageType,
   SiteLayoutRule
@@ -14,7 +14,13 @@ const PAGE_TYPES: PageType[] = [
   "feed",
   "conservative"
 ]
-const STRATEGIES: LayoutStrategy[] = ["preserve", "balanced", "single-column"]
+const LAYOUT_TEMPLATES: LayoutTemplateId[] = [
+  "preserve",
+  "article",
+  "documentation",
+  "forum",
+  "wide"
+]
 const REGIONS: LayoutRegion[] = [
   "header",
   "navigation",
@@ -26,7 +32,7 @@ const REGIONS: LayoutRegion[] = [
 
 const SYSTEM_PROMPT = `You analyze a privacy-reduced DOM outline for a browser reading tool.
 Return one JSON object only, with this exact shape:
-{"pageType":"article|documentation|forum|feed|conservative","strategy":"preserve|balanced|single-column","regions":{"header":"CSS selector","navigation":"CSS selector","content":"CSS selector","sidebar":"CSS selector","comments":"CSS selector","footer":"CSS selector"},"confidence":0.0}
+{"pageType":"article|documentation|forum|feed|conservative","templateId":"preserve|article|documentation|forum|wide","regions":{"header":"CSS selector","navigation":"CSS selector","content":"CSS selector","sidebar":"CSS selector","comments":"CSS selector","footer":"CSS selector"},"confidence":0.0}
 Use only selectors present verbatim in the supplied nodes. Omit uncertain optional regions. The content region is required. Prefer preserve when confidence is low. Do not include markdown or commentary.`
 
 function endpoint(baseUrl: string, path: string) {
@@ -55,8 +61,8 @@ function parseLayout(value: unknown, summary: DomSummary): SiteLayoutRule {
   const result = value as Record<string, unknown>
   if (!PAGE_TYPES.includes(result.pageType as PageType))
     throw new Error("模型返回了未知页面类型")
-  if (!STRATEGIES.includes(result.strategy as LayoutStrategy))
-    throw new Error("模型返回了未知布局策略")
+  if (!LAYOUT_TEMPLATES.includes(result.templateId as LayoutTemplateId))
+    throw new Error("模型返回了未知布局模板")
 
   const allowedSelectors = new Set(summary.nodes.map((node) => node.selector))
   const rawRegions =
@@ -78,7 +84,7 @@ function parseLayout(value: unknown, summary: DomSummary): SiteLayoutRule {
     source: "llm",
     status: "draft",
     pageType: result.pageType as PageType,
-    strategy: result.strategy as LayoutStrategy,
+    templateId: result.templateId as LayoutTemplateId,
     regions,
     confidence: Number.isFinite(confidence)
       ? Math.min(1, Math.max(0, confidence))

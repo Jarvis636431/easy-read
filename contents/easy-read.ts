@@ -7,6 +7,7 @@ import {
 } from "~lib/layout"
 import {
   ACTIVE_SHARE_TEMPLATE_STORAGE_KEY,
+  builtinLayoutTemplates,
   EXTENSION_ENABLED_STORAGE_KEY,
   findMatchingRule,
   readActiveShareTemplateId,
@@ -38,6 +39,8 @@ const STYLE_ID = "easy-read-page-styles"
 const ROOT_CLASS = "easy-read-active"
 const REGION_ATTRIBUTE = "data-easy-read-region"
 const LAYOUT_ATTRIBUTE = "data-easy-read-layout"
+const LAYOUT_SHELL_ID = "easy-read-layout-shell"
+const TEMPLATED_CLASS = "easy-read-templated"
 const PREVIEW_HOST_ID = "easy-read-layout-preview"
 const PREVIEW_STYLE_ID = "easy-read-layout-preview-styles"
 const PREVIEW_CLASS = "easy-read-layout-previewing"
@@ -46,6 +49,7 @@ const SHARE_HOST_ID = "easy-read-share-selection"
 let currentSettings: EasyReadSettings | null = null
 let currentShareTemplate: ShareCardTemplate | null = null
 let sharingEnabled = false
+let movedLayoutNodes: Array<{ node: Element; placeholder: Comment }> = []
 
 const REGION_LABELS: Record<LayoutRegion, string> = {
   header: "页头",
@@ -97,11 +101,11 @@ const AD_SELECTORS = [
 function themeStyles(settings: EasyReadSettings) {
   return `
     html.${ROOT_CLASS}, html.${ROOT_CLASS} body { background: ${settings.pageColor} !important; color: ${settings.textColor} !important; }
-    html.${ROOT_CLASS} :is([${REGION_ATTRIBUTE}], main, article, [role="main"]) { color: ${settings.textColor} !important; }
-    html.${ROOT_CLASS} :is([${REGION_ATTRIBUTE}="content"], main, article, [role="main"]) { background: ${settings.contentColor} !important; }
-    html.${ROOT_CLASS} :is([${REGION_ATTRIBUTE}], main, article, [role="main"]) :is(p, li, blockquote, h1, h2, h3, h4, h5, h6, span):not([class*="icon"]) { color: inherit; }
-    html.${ROOT_CLASS} :is([${REGION_ATTRIBUTE}], main, article, [role="main"]) :is(p, li, blockquote) { font-family: ${settings.fontFamily} !important; }
-    html.${ROOT_CLASS} :is([${REGION_ATTRIBUTE}], main, article, [role="main"]) :is(h1, h2, h3, h4, h5, h6) { font-family: ${settings.headingFontFamily} !important; }
+    html.${ROOT_CLASS} [${REGION_ATTRIBUTE}] { color: ${settings.textColor} !important; }
+    html.${ROOT_CLASS} [${REGION_ATTRIBUTE}="content"] { background: ${settings.contentColor} !important; }
+    html.${ROOT_CLASS} [${REGION_ATTRIBUTE}] :is(p, li, blockquote, h1, h2, h3, h4, h5, h6, span):not([class*="icon"]) { color: inherit; }
+    html.${ROOT_CLASS} [${REGION_ATTRIBUTE}] :is(p, li, blockquote) { font-family: ${settings.fontFamily} !important; }
+    html.${ROOT_CLASS} [${REGION_ATTRIBUTE}] :is(h1, h2, h3, h4, h5, h6) { font-family: ${settings.headingFontFamily} !important; }
     html.${ROOT_CLASS} a { color: ${settings.linkColor} !important; }
     html.${ROOT_CLASS} img { filter: brightness(${settings.imageBrightness}); }
     html.${ROOT_CLASS} [${REGION_ATTRIBUTE}="header"],
@@ -127,20 +131,34 @@ function buildStyles(
     .join("\n")
 
   return `
-    html.${ROOT_CLASS}:not([${LAYOUT_ATTRIBUTE}="preserve"]) :is([${REGION_ATTRIBUTE}="content"], main, article, [role="main"]) {
+    html.${ROOT_CLASS} [${REGION_ATTRIBUTE}="content"] {
       box-sizing: border-box !important;
       max-width: ${settings.contentWidth}px !important;
       margin-inline: auto !important;
       padding-inline: clamp(20px, 4vw, 56px) !important;
     }
-    html.${ROOT_CLASS} :is([${REGION_ATTRIBUTE}="content"], main, article, [role="main"]) :is(p, li, blockquote) {
+    html.${ROOT_CLASS} [${REGION_ATTRIBUTE}="content"] :is(p, li, blockquote) {
       font-size: ${settings.fontSize}px !important;
       line-height: ${settings.lineHeight} !important;
     }
-    html.${ROOT_CLASS} :is([${REGION_ATTRIBUTE}="content"], main, article, [role="main"]) img,
-    html.${ROOT_CLASS} :is([${REGION_ATTRIBUTE}="content"], main, article, [role="main"]) video { max-width: 100% !important; height: auto !important; }
-    html.${ROOT_CLASS}[${LAYOUT_ATTRIBUTE}="balanced"] [${REGION_ATTRIBUTE}="sidebar"] { box-sizing: border-box !important; max-width: min(360px, 32vw) !important; }
-    html.${ROOT_CLASS}[${LAYOUT_ATTRIBUTE}="single-column"] :is([${REGION_ATTRIBUTE}="content"], [${REGION_ATTRIBUTE}="sidebar"], [${REGION_ATTRIBUTE}="comments"]) { box-sizing: border-box !important; width: min(${settings.contentWidth}px, calc(100% - 40px)) !important; max-width: none !important; margin-inline: auto !important; position: static !important; float: none !important; }
+    html.${ROOT_CLASS} [${REGION_ATTRIBUTE}="content"] :is(img, video) { max-width: 100% !important; height: auto !important; }
+    html.${TEMPLATED_CLASS} body > *:not(#${LAYOUT_SHELL_ID}) { display: none !important; }
+    html.${TEMPLATED_CLASS} body > #${LAYOUT_SHELL_ID} { display: grid !important; }
+    #${LAYOUT_SHELL_ID} { box-sizing: border-box !important; width: min(100% - 32px, 1400px) !important; min-height: 100vh !important; margin: 0 auto !important; padding: 18px 0 56px !important; gap: 18px !important; color: ${settings.textColor} !important; background: ${settings.pageColor} !important; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot] { min-width: 0 !important; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot] > [${REGION_ATTRIBUTE}] { box-sizing: border-box !important; position: static !important; inset: auto !important; float: none !important; width: 100% !important; max-width: none !important; margin: 0 !important; transform: none !important; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot="header"] { grid-area: header; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot="navigation"] { grid-area: navigation; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot="content"] { grid-area: content; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot="sidebar"] { grid-area: sidebar; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot="comments"] { grid-area: comments; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot="footer"] { grid-area: footer; }
+    #${LAYOUT_SHELL_ID}[data-template="article"] { width: min(100% - 32px, ${settings.contentWidth + 120}px) !important; grid-template-columns: minmax(0, 1fr); grid-template-areas: "header" "navigation" "content" "comments" "sidebar" "footer"; }
+    #${LAYOUT_SHELL_ID}[data-template="documentation"] { grid-template-columns: minmax(210px, 280px) minmax(0, 1fr); grid-template-areas: "header header" "navigation content" "sidebar content" ". comments" "footer footer"; align-items: start; }
+    #${LAYOUT_SHELL_ID}[data-template="documentation"] [data-easy-read-slot="navigation"] { position: sticky !important; top: 18px !important; max-height: calc(100vh - 36px) !important; overflow: auto !important; }
+    #${LAYOUT_SHELL_ID}[data-template="forum"] { width: min(100% - 32px, 1040px) !important; grid-template-columns: minmax(0, 1fr); grid-template-areas: "header" "navigation" "content" "comments" "sidebar" "footer"; }
+    #${LAYOUT_SHELL_ID}[data-template="wide"] { grid-template-columns: minmax(0, 1fr) minmax(260px, 360px); grid-template-areas: "header header" "navigation navigation" "content sidebar" "comments sidebar" "footer footer"; align-items: start; }
+    @media (max-width: 820px) { #${LAYOUT_SHELL_ID}[data-template] { width: min(100% - 20px, ${settings.contentWidth}px) !important; grid-template-columns: minmax(0, 1fr) !important; grid-template-areas: "header" "navigation" "content" "sidebar" "comments" "footer" !important; } #${LAYOUT_SHELL_ID}[data-template="documentation"] [data-easy-read-slot="navigation"] { position: static !important; max-height: none !important; } }
     ${themeStyles(settings)}
     ${cleanup}
   `
@@ -163,11 +181,61 @@ function applySettings(
   ;(document.head ?? document.documentElement).appendChild(style)
 }
 
+function restoreLayoutTemplate() {
+  for (const { node, placeholder } of [...movedLayoutNodes].reverse()) {
+    if (placeholder.parentNode) {
+      placeholder.parentNode.insertBefore(node, placeholder)
+      placeholder.remove()
+    } else {
+      document.body?.appendChild(node)
+    }
+  }
+  movedLayoutNodes = []
+  document.getElementById(LAYOUT_SHELL_ID)?.remove()
+  document.documentElement.classList.remove(TEMPLATED_CLASS)
+}
+
 function clearLayoutMarkers() {
+  restoreLayoutTemplate()
   document.documentElement.removeAttribute(LAYOUT_ATTRIBUTE)
   document.querySelectorAll(`[${REGION_ATTRIBUTE}]`).forEach((element) => {
     element.removeAttribute(REGION_ATTRIBUTE)
   })
+}
+
+function mountLayoutTemplate(rule: SiteLayoutRule) {
+  if (rule.templateId === "preserve" || !document.body) return
+  const selected = (Object.keys(rule.regions) as LayoutRegion[]).flatMap(
+    (region) => {
+      const element = document.querySelector(rule.regions[region]!)
+      return element ? [{ region, element }] : []
+    }
+  )
+  const unique = selected.filter(
+    ({ element }, index) =>
+      selected.findIndex((item) => item.element === element) === index
+  )
+  if (!unique.some((item) => item.region === "content")) return
+
+  const shell = document.createElement("div")
+  shell.id = LAYOUT_SHELL_ID
+  shell.dataset.template = rule.templateId
+  for (const { region, element } of unique) {
+    const placeholder = document.createComment(`easy-read:${region}`)
+    element.parentNode?.insertBefore(placeholder, element)
+    movedLayoutNodes.push({ node: element, placeholder })
+    let slot = shell.querySelector<HTMLElement>(
+      `[data-easy-read-slot="${region}"]`
+    )
+    if (!slot) {
+      slot = document.createElement("div")
+      slot.dataset.easyReadSlot = region
+      shell.appendChild(slot)
+    }
+    slot.appendChild(element)
+  }
+  document.body.appendChild(shell)
+  document.documentElement.classList.add(TEMPLATED_CLASS)
 }
 
 function clearPreviewUi() {
@@ -190,7 +258,8 @@ function applyLayoutRule(rule = analyzeDocument()) {
       // Invalid selectors are reported by the health check and skipped here.
     }
   }
-  document.documentElement.setAttribute(LAYOUT_ATTRIBUTE, rule.strategy)
+  document.documentElement.setAttribute(LAYOUT_ATTRIBUTE, rule.templateId)
+  mountLayoutTemplate(rule)
   return health
 }
 
@@ -401,6 +470,10 @@ async function previewLayout(rule: SiteLayoutRule, themeId: string) {
       resolvedSettings.mode === "native" ? "comfortable" : resolvedSettings.mode
   }
   const selectors = parseCustomSelectors(matchedRule?.customHideSelectors)
+  const layoutTemplate =
+    builtinLayoutTemplates.find(
+      (template) => template.id === rule.templateId
+    ) ?? builtinLayoutTemplates[0]
 
   const showReflow = () => {
     applySettings(previewSettings, selectors, true)
@@ -447,7 +520,7 @@ async function previewLayout(rule: SiteLayoutRule, themeId: string) {
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     </style>
     <aside role="dialog" aria-label="AI 布局规则预览">
-      <header><div><b>AI 布局草稿</b><small>检查区域和重排效果后再保存</small></div><em>${Math.round(rule.confidence * 100)}%</em></header>
+      <header><div><b>AI 布局草稿 · ${layoutTemplate.name}</b><small>${layoutTemplate.description}</small></div><em>${Math.round(rule.confidence * 100)}%</em></header>
       <div class="body">
         <div class="regions">${regions}</div>
         <div class="compare"><button data-view="original">原页面</button><button class="active" data-view="preview">重排预览</button></div>

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import "./options.css"
 
 import {
+  builtinLayoutTemplates,
   builtinShareTemplates,
   builtinThemes,
   defaultLlmSettings,
@@ -22,7 +23,7 @@ import {
   writeRules,
   type EasyReadSettings,
   type LayoutRegion,
-  type LayoutStrategy,
+  type LayoutTemplateId,
   type LlmProvider,
   type LlmProviderType,
   type LlmSettings,
@@ -48,7 +49,7 @@ function createEmptyLayout(): SiteLayoutRule {
     source: "manual",
     status: "draft",
     pageType: "conservative",
-    strategy: "preserve",
+    templateId: "preserve",
     regions: {},
     confidence: 0,
     createdAt: now,
@@ -1101,18 +1102,30 @@ function OptionsPage() {
                           </select>
                         </label>
                         <label>
-                          <span>布局策略</span>
+                          <span>布局模板</span>
                           <select
-                            value={rule.layout?.strategy ?? "preserve"}
+                            value={rule.layout?.templateId ?? "preserve"}
                             onChange={(event) =>
                               updateLayout(rule, {
-                                strategy: event.target.value as LayoutStrategy
+                                templateId: event.target
+                                  .value as LayoutTemplateId
                               })
                             }>
-                            <option value="preserve">保留布局</option>
-                            <option value="balanced">平衡重排</option>
-                            <option value="single-column">单栏重排</option>
+                            {builtinLayoutTemplates.map((template) => (
+                              <option key={template.id} value={template.id}>
+                                {template.name}
+                              </option>
+                            ))}
                           </select>
+                          <small>
+                            {
+                              builtinLayoutTemplates.find(
+                                (template) =>
+                                  template.id ===
+                                  (rule.layout?.templateId ?? "preserve")
+                              )?.description
+                            }
+                          </small>
                         </label>
                         <button
                           disabled={rule.layout?.status !== "draft"}

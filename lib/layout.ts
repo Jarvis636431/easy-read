@@ -1,4 +1,9 @@
-import type { LayoutRegion, PageType, SiteLayoutRule } from "~lib/settings"
+import {
+  builtinLayoutTemplates,
+  type LayoutRegion,
+  type PageType,
+  type SiteLayoutRule
+} from "~lib/settings"
 
 const REGION_HINTS: Record<LayoutRegion, string[]> = {
   header: ["header", "masthead", "topbar", "top-bar"],
@@ -203,11 +208,20 @@ export function analyzeDocument(): SiteLayoutRule {
   }
 
   const now = Date.now()
+  const pageType = detectPageType(elements)
   return {
     source: "local",
     status: "confirmed",
-    pageType: detectPageType(elements),
-    strategy: elements.content ? "balanced" : "preserve",
+    pageType,
+    templateId: !elements.content
+      ? "preserve"
+      : pageType === "documentation"
+        ? "documentation"
+        : pageType === "forum"
+          ? "forum"
+          : pageType === "feed"
+            ? "wide"
+            : "article",
     regions: Object.fromEntries(
       Object.entries(elements).map(([region, element]) => [
         region,
@@ -295,7 +309,12 @@ export function checkLayoutHealth(rule?: SiteLayoutRule): LayoutHealth {
   }
   const score = entries.length ? matchedRegions / entries.length : 0
   return {
-    valid: Boolean(rule.regions.content) && score >= 0.6,
+    valid:
+      Boolean(rule.regions.content) &&
+      score >= 0.6 &&
+      builtinLayoutTemplates.some(
+        (template) => template.id === rule.templateId
+      ),
     score,
     matchedRegions,
     missingRegions

@@ -97,7 +97,34 @@ export type PageType =
   | "forum"
   | "feed"
   | "conservative"
-export type LayoutStrategy = "preserve" | "balanced" | "single-column"
+export type LayoutTemplateId =
+  | "preserve"
+  | "article"
+  | "documentation"
+  | "forum"
+  | "wide"
+
+export type LayoutTemplate = {
+  id: LayoutTemplateId
+  name: string
+  description: string
+}
+
+export const builtinLayoutTemplates: LayoutTemplate[] = [
+  { id: "preserve", name: "保留原页", description: "不移动 DOM，只应用主题" },
+  {
+    id: "article",
+    name: "文章单栏",
+    description: "正文居中，评论接在正文之后"
+  },
+  {
+    id: "documentation",
+    name: "文档双栏",
+    description: "导航固定在左侧，正文位于右侧"
+  },
+  { id: "forum", name: "论坛流", description: "主帖与回复按阅读顺序纵向排列" },
+  { id: "wide", name: "宽屏双栏", description: "正文与辅助侧栏并排展示" }
+]
 export type LayoutRegion =
   | "header"
   | "navigation"
@@ -110,7 +137,7 @@ export type SiteLayoutRule = {
   source: LayoutRuleSource
   status: "draft" | "confirmed"
   pageType: PageType
-  strategy: LayoutStrategy
+  templateId: LayoutTemplateId
   regions: Partial<Record<LayoutRegion, string>>
   confidence: number
   createdAt: number
