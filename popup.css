@@ -84,6 +84,91 @@ h1 {
   font-size: 10px;
   font-weight: 600;
 }
+.command-card {
+  margin: 14px 22px 0 28px;
+  padding: 13px;
+  border: 1px solid #aac2bf;
+  border-left: 4px solid #287781;
+  border-radius: 4px;
+  background: #f1f6f3;
+  box-shadow: 0 5px 18px #1830390b;
+}
+.command-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  color: #29474c;
+  font-size: 11px;
+  font-weight: 700;
+}
+.command-heading b {
+  padding: 3px 5px;
+  color: #f7faf8;
+  font:
+    700 8px/1 "SFMono-Regular",
+    Consolas,
+    monospace;
+  border-radius: 2px;
+  background: #287781;
+}
+.command-card form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  overflow: hidden;
+  border: 1px solid #b9cbc8;
+  border-radius: 4px;
+  background: white;
+}
+.command-card form input {
+  min-width: 0;
+  height: 37px;
+  padding: 0 10px;
+  color: #234147;
+  font-size: 11px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+.command-card form button {
+  min-width: 52px;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  border: 0;
+  background: #183039;
+}
+.command-card button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+.command-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.command-presets button {
+  padding: 4px 7px;
+  color: #41666b;
+  font-size: 8px;
+  border: 1px solid #c4d3d0;
+  border-radius: 10px;
+  background: #fbfcfa;
+}
+.command-status {
+  display: block;
+  margin-top: 8px;
+  overflow: hidden;
+  color: #7a898a;
+  font-size: 8px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.command-status.visible {
+  color: #286c73;
+}
 .site-card {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;

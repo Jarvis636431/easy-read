@@ -139,6 +139,10 @@ export type SiteLayoutRule = {
   pageType: PageType
   templateId: LayoutTemplateId
   regions: Partial<Record<LayoutRegion, string>>
+  hiddenRegions: LayoutRegion[]
+  collapsedRegions: LayoutRegion[]
+  instruction?: string
+  planSummary?: string
   confidence: number
   createdAt: number
   updatedAt: number

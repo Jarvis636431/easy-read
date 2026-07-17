@@ -228,6 +228,8 @@ export function analyzeDocument(): SiteLayoutRule {
         selectorFor(element)
       ])
     ),
+    hiddenRegions: [],
+    collapsedRegions: [],
     confidence: scores.length
       ? Number(
           (

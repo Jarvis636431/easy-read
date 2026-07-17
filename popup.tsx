@@ -35,6 +35,8 @@ function IndexPopup() {
   const [layoutStatus, setLayoutStatus] = useState("")
   const [llmSettings, setLlmSettings] = useState<LlmSettings | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [readingCommand, setReadingCommand] = useState("")
+  const [commandStatus, setCommandStatus] = useState("")
   const [site, setSite] = useState<{
     hostname: string
     supported: boolean
@@ -195,6 +197,40 @@ function IndexPopup() {
     }
   }
 
+  const executeReadingCommand = async (instruction = readingCommand) => {
+    const normalized = instruction.trim()
+    if (!site?.supported || !site.tabId || !site.url || !normalized) return
+    setReadingCommand(normalized)
+    setAnalyzing(true)
+    setCommandStatus("正在理解你的阅读目标…")
+    try {
+      const summaryResponse = (await chrome.tabs.sendMessage(site.tabId, {
+        type: "easy-read:get-layout-summary"
+      })) as { summary: DomSummary }
+      const response = (await chrome.runtime.sendMessage({
+        type: "easy-read:interpret-reading-command",
+        instruction: normalized,
+        summary: summaryResponse.summary
+      })) as { ok: boolean; layout?: SiteLayoutRule; error?: string }
+      if (!response.ok || !response.layout)
+        throw new Error(response.error ?? "无法生成阅读计划")
+      setCommandStatus("正在网页中生成阅读预览…")
+      const preview = (await chrome.tabs.sendMessage(site.tabId, {
+        type: "easy-read:preview-layout",
+        layout: response.layout,
+        themeId: activeThemeId
+      })) as { ok: boolean; error?: string }
+      if (!preview.ok) throw new Error(preview.error ?? "无法打开阅读预览")
+      setCommandStatus("阅读预览已打开，请在网页中确认")
+    } catch (error) {
+      setCommandStatus(
+        error instanceof Error ? error.message : "无法执行阅读指令"
+      )
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
   const activeProvider = llmSettings?.providers.find(
     (provider) => provider.id === llmSettings.activeProviderId
   )
@@ -206,8 +242,8 @@ function IndexPopup() {
     <main className="panel" aria-busy={!ready}>
       <header className="masthead">
         <div>
-          <p className="eyebrow">EASY READ</p>
-          <h1>阅读校准器</h1>
+          <p className="eyebrow">READAPT</p>
+          <h1>随阅</h1>
         </div>
         <label className="power">
           <input
@@ -223,6 +259,58 @@ function IndexPopup() {
           <b>{extensionEnabled ? "已启用" : "已关闭"}</b>
         </label>
       </header>
+
+      <section className="command-card" aria-label="自然语言阅读指令">
+        <div className="command-heading">
+          <span>告诉随阅，你想怎样阅读</span>
+          <b>AI</b>
+        </div>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            void executeReadingCommand()
+          }}>
+          <input
+            value={readingCommand}
+            maxLength={240}
+            disabled={analyzing}
+            placeholder="例如：帮我快速阅读，只保留重点"
+            aria-label="阅读指令"
+            onChange={(event) => setReadingCommand(event.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={
+              analyzing ||
+              !aiReady ||
+              !site?.supported ||
+              !readingCommand.trim()
+            }>
+            执行
+          </button>
+        </form>
+        <div className="command-presets" aria-label="快捷阅读指令">
+          {["帮我快速阅读", "改成学习模式", "只保留正文和评论"].map(
+            (command) => (
+              <button
+                key={command}
+                disabled={analyzing || !aiReady || !site?.supported}
+                onClick={() => void executeReadingCommand(command)}>
+                {command}
+              </button>
+            )
+          )}
+        </div>
+        <small
+          className={
+            commandStatus ? "command-status visible" : "command-status"
+          }>
+          {commandStatus ||
+            (aiReady
+              ? "结果会先进入预览，不会直接修改页面"
+              : "请先在设置页配置并启用 AI")}
+        </small>
+      </section>
 
       <section className="site-card" aria-label="当前网站状态">
         <div className="site-mark" aria-hidden="true">

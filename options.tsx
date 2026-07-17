@@ -51,6 +51,8 @@ function createEmptyLayout(): SiteLayoutRule {
     pageType: "conservative",
     templateId: "preserve",
     regions: {},
+    hiddenRegions: [],
+    collapsedRegions: [],
     confidence: 0,
     createdAt: now,
     updatedAt: now

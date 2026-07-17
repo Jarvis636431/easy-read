@@ -35,6 +35,11 @@ Return one JSON object only, with this exact shape:
 {"pageType":"article|documentation|forum|feed|conservative","templateId":"preserve|article|documentation|forum|wide","regions":{"header":"CSS selector","navigation":"CSS selector","content":"CSS selector","sidebar":"CSS selector","comments":"CSS selector","footer":"CSS selector"},"confidence":0.0}
 Use only selectors present verbatim in the supplied nodes. Omit uncertain optional regions. The content region is required. Prefer preserve when confidence is low. Do not include markdown or commentary.`
 
+const READING_COMMAND_PROMPT = `You turn a natural-language reading request and a privacy-reduced DOM outline into a safe reading plan.
+Return one JSON object only, with this exact shape:
+{"pageType":"article|documentation|forum|feed|conservative","templateId":"preserve|article|documentation|forum|wide","regions":{"header":"CSS selector","navigation":"CSS selector","content":"CSS selector","sidebar":"CSS selector","comments":"CSS selector","footer":"CSS selector"},"hiddenRegions":["header|navigation|sidebar|comments|footer"],"collapsedRegions":["header|navigation|sidebar|comments|footer"],"summary":"short Chinese explanation","confidence":0.0}
+Use only selectors present verbatim in the supplied nodes. The content region is required and must never be hidden or collapsed. A region cannot be both hidden and collapsed. Interpret the user's goal conservatively. Use article for focused or quick reading, documentation for learning and documentation, forum for discussions, and wide for information-dense comparison. Do not generate HTML, CSS, scripts, prose outside JSON, or content that was not provided.`
+
 function endpoint(baseUrl: string, path: string) {
   const normalized = baseUrl.trim().replace(/\/+$/, "")
   if (!/^https?:\/\//i.test(normalized))
@@ -56,7 +61,11 @@ function extractJson(text: string) {
   return JSON.parse(trimmed.slice(start, end + 1)) as unknown
 }
 
-function parseLayout(value: unknown, summary: DomSummary): SiteLayoutRule {
+function parseLayout(
+  value: unknown,
+  summary: DomSummary,
+  instruction?: string
+): SiteLayoutRule {
   if (!value || typeof value !== "object") throw new Error("模型返回格式无效")
   const result = value as Record<string, unknown>
   if (!PAGE_TYPES.includes(result.pageType as PageType))
@@ -78,6 +87,20 @@ function parseLayout(value: unknown, summary: DomSummary): SiteLayoutRule {
   }
   if (!regions.content) throw new Error("模型没有识别出有效正文区域")
 
+  const parseRegionList = (input: unknown) =>
+    Array.isArray(input)
+      ? input.filter(
+          (region): region is LayoutRegion =>
+            REGIONS.includes(region as LayoutRegion) &&
+            region !== "content" &&
+            Boolean(regions[region as LayoutRegion])
+        )
+      : []
+  const hiddenRegions = parseRegionList(result.hiddenRegions)
+  const collapsedRegions = parseRegionList(result.collapsedRegions).filter(
+    (region) => !hiddenRegions.includes(region)
+  )
+
   const confidence = Number(result.confidence)
   const now = Date.now()
   return {
@@ -86,6 +109,13 @@ function parseLayout(value: unknown, summary: DomSummary): SiteLayoutRule {
     pageType: result.pageType as PageType,
     templateId: result.templateId as LayoutTemplateId,
     regions,
+    hiddenRegions,
+    collapsedRegions,
+    instruction,
+    planSummary:
+      typeof result.summary === "string"
+        ? result.summary.slice(0, 160)
+        : undefined,
     confidence: Number.isFinite(confidence)
       ? Math.min(1, Math.max(0, confidence))
       : 0,
@@ -106,7 +136,8 @@ async function readError(response: Response) {
 
 async function callOpenAiCompatible(
   provider: LlmProvider,
-  summary: DomSummary
+  systemPrompt: string,
+  payload: unknown
 ) {
   const response = await fetch(
     endpoint(provider.baseUrl, "/v1/chat/completions"),
@@ -121,8 +152,8 @@ async function callOpenAiCompatible(
         temperature: 0,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: JSON.stringify(summary) }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: JSON.stringify(payload) }
         ]
       })
     }
@@ -137,7 +168,11 @@ async function callOpenAiCompatible(
   return content
 }
 
-async function callAnthropic(provider: LlmProvider, summary: DomSummary) {
+async function callAnthropic(
+  provider: LlmProvider,
+  systemPrompt: string,
+  payload: unknown
+) {
   const response = await fetch(endpoint(provider.baseUrl, "/v1/messages"), {
     method: "POST",
     headers: {
@@ -149,8 +184,8 @@ async function callAnthropic(provider: LlmProvider, summary: DomSummary) {
       model: provider.model,
       max_tokens: 1200,
       temperature: 0,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: JSON.stringify(summary) }]
+      system: systemPrompt,
+      messages: [{ role: "user", content: JSON.stringify(payload) }]
     })
   })
   if (!response.ok)
@@ -175,7 +210,25 @@ export async function analyzeLayoutWithLlm(
   if (!summary.nodes.length) throw new Error("当前页面没有可分析的结构")
   const content =
     provider.type === "anthropic"
-      ? await callAnthropic(provider, summary)
-      : await callOpenAiCompatible(provider, summary)
+      ? await callAnthropic(provider, SYSTEM_PROMPT, summary)
+      : await callOpenAiCompatible(provider, SYSTEM_PROMPT, summary)
   return parseLayout(extractJson(content), summary)
+}
+
+export async function interpretReadingCommand(
+  provider: LlmProvider,
+  summary: DomSummary,
+  instruction: string
+) {
+  const normalized = instruction.trim().slice(0, 240)
+  if (!normalized) throw new Error("请输入阅读指令")
+  if (!provider.apiKey.trim()) throw new Error("请先填写 API Key")
+  if (!provider.model.trim()) throw new Error("请先填写模型名称")
+  if (!summary.nodes.length) throw new Error("当前页面没有可分析的结构")
+  const payload = { instruction: normalized, page: summary }
+  const content =
+    provider.type === "anthropic"
+      ? await callAnthropic(provider, READING_COMMAND_PROMPT, payload)
+      : await callOpenAiCompatible(provider, READING_COMMAND_PROMPT, payload)
+  return parseLayout(extractJson(content), summary, normalized)
 }

@@ -38,6 +38,7 @@ export const config: PlasmoCSConfig = {
 const STYLE_ID = "easy-read-page-styles"
 const ROOT_CLASS = "easy-read-active"
 const REGION_ATTRIBUTE = "data-easy-read-region"
+const VISIBILITY_ATTRIBUTE = "data-easy-read-visibility"
 const LAYOUT_ATTRIBUTE = "data-easy-read-layout"
 const LAYOUT_SHELL_ID = "easy-read-layout-shell"
 const TEMPLATED_CLASS = "easy-read-templated"
@@ -142,10 +143,16 @@ function buildStyles(
       line-height: ${settings.lineHeight} !important;
     }
     html.${ROOT_CLASS} [${REGION_ATTRIBUTE}="content"] :is(img, video) { max-width: 100% !important; height: auto !important; }
+    html.${ROOT_CLASS} [${VISIBILITY_ATTRIBUTE}="hidden"] { display: none !important; }
+    html.${ROOT_CLASS} [${VISIBILITY_ATTRIBUTE}="collapsed"] { position: relative !important; max-height: 84px !important; overflow: hidden !important; opacity: .72 !important; }
     html.${TEMPLATED_CLASS} body > *:not(#${LAYOUT_SHELL_ID}) { display: none !important; }
     html.${TEMPLATED_CLASS} body > #${LAYOUT_SHELL_ID} { display: grid !important; }
     #${LAYOUT_SHELL_ID} { box-sizing: border-box !important; width: min(100% - 32px, 1400px) !important; min-height: 100vh !important; margin: 0 auto !important; padding: 18px 0 56px !important; gap: 18px !important; color: ${settings.textColor} !important; background: ${settings.pageColor} !important; }
     #${LAYOUT_SHELL_ID} [data-easy-read-slot] { min-width: 0 !important; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot][data-state="hidden"] { display: none !important; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot][data-state="collapsed"] { position: relative !important; max-height: 92px !important; overflow: hidden !important; opacity: .76 !important; }
+    #${LAYOUT_SHELL_ID} [data-easy-read-slot][data-state="expanded"] { max-height: none !important; overflow: visible !important; opacity: 1 !important; }
+    html.${ROOT_CLASS} .easy-read-expand-region { position: absolute !important; z-index: 2 !important; right: 10px !important; bottom: 8px !important; min-height: 30px !important; padding: 0 10px !important; color: ${settings.linkColor} !important; font: 700 11px/1 ${settings.fontFamily} !important; cursor: pointer !important; border: 1px solid color-mix(in srgb, ${settings.linkColor} 45%, transparent) !important; border-radius: 4px !important; background: ${settings.contentColor} !important; box-shadow: 0 3px 12px color-mix(in srgb, ${settings.textColor} 14%, transparent) !important; }
     #${LAYOUT_SHELL_ID} [data-easy-read-slot] > [${REGION_ATTRIBUTE}] { box-sizing: border-box !important; position: static !important; inset: auto !important; float: none !important; width: 100% !important; max-width: none !important; margin: 0 !important; transform: none !important; }
     #${LAYOUT_SHELL_ID} [data-easy-read-slot="header"] { grid-area: header; }
     #${LAYOUT_SHELL_ID} [data-easy-read-slot="navigation"] { grid-area: navigation; }
@@ -197,9 +204,13 @@ function restoreLayoutTemplate() {
 
 function clearLayoutMarkers() {
   restoreLayoutTemplate()
+  document
+    .querySelectorAll(".easy-read-expand-region")
+    .forEach((button) => button.remove())
   document.documentElement.removeAttribute(LAYOUT_ATTRIBUTE)
   document.querySelectorAll(`[${REGION_ATTRIBUTE}]`).forEach((element) => {
     element.removeAttribute(REGION_ATTRIBUTE)
+    element.removeAttribute(VISIBILITY_ATTRIBUTE)
   })
 }
 
@@ -232,8 +243,24 @@ function mountLayoutTemplate(rule: SiteLayoutRule) {
       slot.dataset.easyReadSlot = region
       shell.appendChild(slot)
     }
+    if (rule.hiddenRegions?.includes(region)) slot.dataset.state = "hidden"
+    else if (rule.collapsedRegions?.includes(region))
+      slot.dataset.state = "collapsed"
+    element.removeAttribute(VISIBILITY_ATTRIBUTE)
     slot.appendChild(element)
   }
+  shell
+    .querySelectorAll<HTMLElement>('[data-state="collapsed"]')
+    .forEach((slot) => {
+      const button = document.createElement("button")
+      button.className = "easy-read-expand-region"
+      button.textContent = "展开此区域"
+      button.addEventListener("click", () => {
+        slot.dataset.state = "expanded"
+        button.remove()
+      })
+      slot.appendChild(button)
+    })
   document.body.appendChild(shell)
   document.documentElement.classList.add(TEMPLATED_CLASS)
 }
@@ -253,6 +280,10 @@ function applyLayoutRule(rule = analyzeDocument()) {
     try {
       document.querySelectorAll(selector).forEach((element) => {
         element.setAttribute(REGION_ATTRIBUTE, region)
+        if (rule.hiddenRegions?.includes(region as LayoutRegion))
+          element.setAttribute(VISIBILITY_ATTRIBUTE, "hidden")
+        else if (rule.collapsedRegions?.includes(region as LayoutRegion))
+          element.setAttribute(VISIBILITY_ATTRIBUTE, "collapsed")
       })
     } catch {
       // Invalid selectors are reported by the health check and skipped here.
@@ -260,6 +291,22 @@ function applyLayoutRule(rule = analyzeDocument()) {
   }
   document.documentElement.setAttribute(LAYOUT_ATTRIBUTE, rule.templateId)
   mountLayoutTemplate(rule)
+  if (rule.templateId === "preserve") {
+    for (const region of rule.collapsedRegions ?? []) {
+      const element = document.querySelector<HTMLElement>(
+        `[${REGION_ATTRIBUTE}="${region}"]`
+      )
+      if (!element) continue
+      const button = document.createElement("button")
+      button.className = "easy-read-expand-region"
+      button.textContent = "展开此区域"
+      button.addEventListener("click", () => {
+        element.removeAttribute(VISIBILITY_ATTRIBUTE)
+        button.remove()
+      })
+      element.appendChild(button)
+    }
+  }
   return health
 }
 
@@ -491,10 +538,14 @@ async function previewLayout(rule: SiteLayoutRule, themeId: string) {
   host.id = PREVIEW_HOST_ID
   const shadow = host.attachShadow({ mode: "closed" })
   const regions = (Object.keys(rule.regions) as LayoutRegion[])
-    .map(
-      (region) =>
-        `<span><i style="--region-color:${REGION_COLORS[region]}"></i>${REGION_LABELS[region]}</span>`
-    )
+    .map((region) => {
+      const state = rule.hiddenRegions?.includes(region)
+        ? "隐藏"
+        : rule.collapsedRegions?.includes(region)
+          ? "折叠"
+          : "保留"
+      return `<span><i style="--region-color:${REGION_COLORS[region]}"></i>${REGION_LABELS[region]}<em>${state}</em></span>`
+    })
     .join("")
   shadow.innerHTML = `
     <style>
@@ -510,6 +561,7 @@ async function previewLayout(rule: SiteLayoutRule, themeId: string) {
       .regions { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 12px; }
       .regions span { display: flex; align-items: center; gap: 4px; color: #607275; font-size: 9px; }
       .regions i { width: 8px; height: 8px; border-radius: 2px; background: var(--region-color); }
+      .regions em { color: #8a9899; font-size: 8px; font-style: normal; }
       .compare { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 4px; background: #e5ecea; }
       button { min-height: 32px; padding: 0 10px; color: #38575b; font: 700 10px/1 inherit; cursor: pointer; border: 0; border-radius: 3px; background: transparent; }
       .compare button.active { color: #1d656d; background: white; box-shadow: 0 1px 4px #1830391a; }
@@ -520,7 +572,7 @@ async function previewLayout(rule: SiteLayoutRule, themeId: string) {
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     </style>
     <aside role="dialog" aria-label="AI 布局规则预览">
-      <header><div><b>AI 布局草稿 · ${layoutTemplate.name}</b><small>${layoutTemplate.description}</small></div><em>${Math.round(rule.confidence * 100)}%</em></header>
+      <header><div><b>AI 布局草稿 · ${layoutTemplate.name}</b><small>${rule.planSummary ?? layoutTemplate.description}</small></div><em>${Math.round(rule.confidence * 100)}%</em></header>
       <div class="body">
         <div class="regions">${regions}</div>
         <div class="compare"><button data-view="original">原页面</button><button class="active" data-view="preview">重排预览</button></div>
