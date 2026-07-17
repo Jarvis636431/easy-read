@@ -1,5 +1,10 @@
 import type { DomSummary } from "~lib/layout"
-import { analyzeLayoutWithLlm, interpretReadingCommand } from "~lib/llm"
+import {
+  analyzeLayoutWithLlm,
+  assistSelection,
+  interpretReadingCommand,
+  type SelectionAssistantAction
+} from "~lib/llm"
 import {
   AD_RULESET_ID,
   EXTENSION_ENABLED_STORAGE_KEY,
@@ -44,7 +49,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (
     message?.type !== "easy-read:analyze-layout-with-llm" &&
-    message?.type !== "easy-read:interpret-reading-command"
+    message?.type !== "easy-read:interpret-reading-command" &&
+    message?.type !== "easy-read:assist-selection"
   )
     return
   void (async () => {
@@ -55,6 +61,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         (item) => item.id === settings.activeProviderId
       )
       if (!provider) throw new Error("未找到当前 AI 供应商")
+      if (message.type === "easy-read:assist-selection") {
+        const result = await assistSelection(
+          provider,
+          message.action as SelectionAssistantAction,
+          String(message.selectedText ?? ""),
+          String(message.context ?? ""),
+          String(message.pageLanguage ?? "")
+        )
+        sendResponse({ ok: true, result })
+        return
+      }
       const layout =
         message.type === "easy-read:interpret-reading-command"
           ? await interpretReadingCommand(

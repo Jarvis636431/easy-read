@@ -40,6 +40,21 @@ Return one JSON object only, with this exact shape:
 {"pageType":"article|documentation|forum|feed|conservative","templateId":"preserve|article|documentation|forum|wide","regions":{"header":"CSS selector","navigation":"CSS selector","content":"CSS selector","sidebar":"CSS selector","comments":"CSS selector","footer":"CSS selector"},"hiddenRegions":["header|navigation|sidebar|comments|footer"],"collapsedRegions":["header|navigation|sidebar|comments|footer"],"summary":"short Chinese explanation","confidence":0.0}
 Use only selectors present verbatim in the supplied nodes. The content region is required and must never be hidden or collapsed. A region cannot be both hidden and collapsed. Interpret the user's goal conservatively. Use article for focused or quick reading, documentation for learning and documentation, forum for discussions, and wide for information-dense comparison. Do not generate HTML, CSS, scripts, prose outside JSON, or content that was not provided.`
 
+const SELECTION_ASSISTANT_PROMPT = `You are a concise reading assistant for selected webpage text.
+Return one JSON object only, with this exact shape:
+{"title":"short title","answer":"plain-text answer","keyPoints":["optional point"]}
+For explain: explain the selected text in clear Simplified Chinese, using the supplied context only when helpful. Do not invent facts.
+For translate: if the selected text is primarily Chinese, translate it into natural English; otherwise translate it into natural Simplified Chinese. Preserve names, numbers, code, and meaning. Put only the translation in answer and return an empty keyPoints array.
+Never return HTML, Markdown, scripts, or commentary outside JSON.`
+
+export type SelectionAssistantAction = "explain" | "translate"
+
+export type SelectionAssistantResult = {
+  title: string
+  answer: string
+  keyPoints: string[]
+}
+
 function endpoint(baseUrl: string, path: string) {
   const normalized = baseUrl.trim().replace(/\/+$/, "")
   if (!/^https?:\/\//i.test(normalized))
@@ -231,4 +246,54 @@ export async function interpretReadingCommand(
       ? await callAnthropic(provider, READING_COMMAND_PROMPT, payload)
       : await callOpenAiCompatible(provider, READING_COMMAND_PROMPT, payload)
   return parseLayout(extractJson(content), summary, normalized)
+}
+
+export async function assistSelection(
+  provider: LlmProvider,
+  action: SelectionAssistantAction,
+  selectedText: string,
+  context: string,
+  pageLanguage: string
+): Promise<SelectionAssistantResult> {
+  const text = selectedText.replace(/\s+/g, " ").trim().slice(0, 1600)
+  if (!text) throw new Error("没有可处理的选中文字")
+  if (action !== "explain" && action !== "translate")
+    throw new Error("不支持的划词操作")
+  if (!provider.apiKey.trim()) throw new Error("请先填写 API Key")
+  if (!provider.model.trim()) throw new Error("请先填写模型名称")
+  const payload = {
+    action,
+    selectedText: text,
+    context: context.replace(/\s+/g, " ").trim().slice(0, 1200),
+    pageLanguage: pageLanguage.slice(0, 24)
+  }
+  const content =
+    provider.type === "anthropic"
+      ? await callAnthropic(provider, SELECTION_ASSISTANT_PROMPT, payload)
+      : await callOpenAiCompatible(
+          provider,
+          SELECTION_ASSISTANT_PROMPT,
+          payload
+        )
+  const parsed = extractJson(content)
+  if (!parsed || typeof parsed !== "object") throw new Error("模型返回格式无效")
+  const value = parsed as Record<string, unknown>
+  if (typeof value.answer !== "string" || !value.answer.trim())
+    throw new Error("模型没有返回有效结果")
+  return {
+    title:
+      typeof value.title === "string" && value.title.trim()
+        ? value.title.trim().slice(0, 80)
+        : action === "translate"
+          ? "翻译"
+          : "解释",
+    answer: value.answer.trim().slice(0, 6000),
+    keyPoints: Array.isArray(value.keyPoints)
+      ? value.keyPoints
+          .filter((point): point is string => typeof point === "string")
+          .map((point) => point.trim().slice(0, 240))
+          .filter(Boolean)
+          .slice(0, 5)
+      : []
+  }
 }

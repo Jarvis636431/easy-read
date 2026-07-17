@@ -5,6 +5,10 @@ import {
   checkLayoutHealth,
   createDomSummary
 } from "~lib/layout"
+import type {
+  SelectionAssistantAction,
+  SelectionAssistantResult
+} from "~lib/llm"
 import {
   ACTIVE_SHARE_TEMPLATE_STORAGE_KEY,
   builtinLayoutTemplates,
@@ -376,7 +380,46 @@ function selectionIsEditable(selection: Selection) {
   return Boolean(element?.closest("input, textarea, [contenteditable='true']"))
 }
 
-function showShareAction() {
+function selectionContext(selection: Selection) {
+  if (!selection.rangeCount) return ""
+  const ancestor = selection.getRangeAt(0).commonAncestorContainer
+  const element =
+    ancestor instanceof Element ? ancestor : ancestor.parentElement
+  const container = element?.closest(
+    "p, li, blockquote, article, section, main, [role='main']"
+  )
+  return (container?.textContent ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 1800)
+}
+
+function assistantCardStyles(settings: EasyReadSettings) {
+  return `
+    :host { all: initial; }
+    * { box-sizing: border-box; }
+    button { font: inherit; }
+    .tools { display: flex; overflow: hidden; border: 1px solid color-mix(in srgb, ${settings.linkColor} 42%, ${settings.contentColor}); border-radius: 5px; background: ${settings.contentColor}; box-shadow: 0 9px 28px color-mix(in srgb, ${settings.textColor} 24%, transparent); }
+    .tools button { min-height: 36px; padding: 0 14px; color: ${settings.textColor}; font: 700 11px/1 ${settings.fontFamily}; cursor: pointer; border: 0; background: transparent; }
+    .tools button + button { border-left: 1px solid color-mix(in srgb, ${settings.textColor} 14%, transparent); }
+    .tools button:hover { color: ${settings.linkColor}; background: color-mix(in srgb, ${settings.linkColor} 9%, transparent); }
+    .tools button:disabled { cursor: default; opacity: .48; }
+    article { width: min(390px, calc(100vw - 24px)); overflow: hidden; color: ${settings.textColor}; font-family: ${settings.fontFamily}; border: 1px solid color-mix(in srgb, ${settings.linkColor} 36%, ${settings.contentColor}); border-left: 5px solid ${settings.linkColor}; border-radius: 7px; background: ${settings.contentColor}; box-shadow: 0 16px 48px color-mix(in srgb, ${settings.textColor} 26%, transparent); }
+    header { display: flex; align-items: center; gap: 8px; padding: 11px 12px 10px 14px; border-bottom: 1px solid color-mix(in srgb, ${settings.textColor} 13%, transparent); }
+    header b { min-width: 0; margin-right: auto; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    header button { min-height: 27px; padding: 0 8px; color: ${settings.linkColor}; font-size: 9px; font-weight: 700; cursor: pointer; border: 1px solid color-mix(in srgb, ${settings.linkColor} 35%, transparent); border-radius: 3px; background: transparent; }
+    header .close { width: 27px; padding: 0; color: color-mix(in srgb, ${settings.textColor} 65%, transparent); font-size: 15px; border: 0; }
+    .body { max-height: min(430px, 62vh); padding: 14px 15px 16px; overflow: auto; }
+    .answer { margin: 0; font-size: 13px; line-height: 1.75; white-space: pre-wrap; }
+    ul { display: grid; gap: 6px; margin: 13px 0 0; padding: 12px 0 0 18px; font-size: 11px; line-height: 1.6; border-top: 1px solid color-mix(in srgb, ${settings.textColor} 12%, transparent); }
+    .loading { margin: 0; color: color-mix(in srgb, ${settings.textColor} 68%, transparent); font-size: 11px; }
+    .error { color: #a64b45; }
+    button:focus-visible { outline: 2px solid #e29656; outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  `
+}
+
+function showSelectionActions() {
   clearShareAction()
   if (
     !sharingEnabled ||
@@ -390,45 +433,111 @@ function showShareAction() {
   if (!selection || text.length < 2 || selectionIsEditable(selection)) return
   const rect = selectionRect(selection)
   if (!rect) return
+  const context = selectionContext(selection)
 
   const host = document.createElement("div")
   host.id = SHARE_HOST_ID
   host.style.position = "fixed"
   host.style.zIndex = "2147483646"
-  host.style.left = `${Math.max(10, Math.min(innerWidth - 154, rect.left + rect.width / 2 - 72))}px`
+  host.style.left = `${Math.max(10, Math.min(innerWidth - 150, rect.left + rect.width / 2 - 70))}px`
   host.style.top = `${Math.max(10, rect.top - 46)}px`
   const shadow = host.attachShadow({ mode: "closed" })
   shadow.innerHTML = `
-    <style>
-      :host { all: initial; }
-      button { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 12px; color: #f7faf8; font: 700 11px/1 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; cursor: pointer; border: 1px solid #45696d; border-radius: 5px; background: #183039; box-shadow: 0 8px 24px #102a3040; }
-      button::before { content: "◫"; color: #8fc4c6; font-size: 15px; }
-      button:hover { background: #22515a; }
-      button:disabled { cursor: default; opacity: .88; }
-      button:focus-visible { outline: 2px solid #e29656; outline-offset: 2px; }
-      @media (prefers-reduced-motion: reduce) { button { transition: none; } }
-    </style>
-    <button type="button">复制分享卡片</button>`
-  const button = shadow.querySelector("button")!
-  button.addEventListener("pointerdown", (event) => event.preventDefault())
-  button.addEventListener("click", async () => {
-    button.disabled = true
-    button.textContent = "正在生成图片…"
-    try {
-      await copyShareCard(
-        text,
-        currentSettings!,
-        currentShareTemplate!,
-        location.hostname
-      )
-      button.textContent = "图片已复制"
-      window.setTimeout(clearShareAction, 1200)
-    } catch (error) {
-      button.disabled = false
-      button.textContent =
-        error instanceof Error ? error.message : "复制失败，请重试"
+    <style>${assistantCardStyles(currentSettings)}</style>
+    <div class="tools"><button data-action="explain">解释</button><button data-action="translate">翻译</button></div>`
+
+  const renderResult = (
+    action: SelectionAssistantAction,
+    result?: SelectionAssistantResult,
+    error?: string
+  ) => {
+    host.dataset.pinned = "true"
+    host.style.left = `${Math.max(12, Math.min(innerWidth - 402, rect.left))}px`
+    host.style.top = `${
+      rect.bottom < innerHeight * 0.45
+        ? rect.bottom + 10
+        : Math.max(12, rect.top - Math.min(450, innerHeight * 0.64))
+    }px`
+    shadow.innerHTML = `
+      <style>${assistantCardStyles(currentSettings!)}</style>
+      <article>
+        <header><b></b><button data-share>分享</button><button class="close" data-close aria-label="关闭">×</button></header>
+        <div class="body"><p class="answer"></p><ul hidden></ul></div>
+      </article>`
+    shadow.querySelector("header b")!.textContent =
+      result?.title ?? (action === "translate" ? "正在翻译" : "正在解释")
+    const answer = shadow.querySelector<HTMLElement>(".answer")!
+    answer.textContent = error ?? result?.answer ?? "正在联系阅读助手…"
+    answer.className = error
+      ? "answer error"
+      : result
+        ? "answer"
+        : "answer loading"
+    const list = shadow.querySelector<HTMLUListElement>("ul")!
+    for (const point of result?.keyPoints ?? []) {
+      const item = document.createElement("li")
+      item.textContent = point
+      list.appendChild(item)
     }
-  })
+    list.hidden = !list.children.length
+    const shareButton = shadow.querySelector<HTMLButtonElement>("[data-share]")!
+    shareButton.disabled = !result
+    shareButton.addEventListener("click", async () => {
+      shareButton.disabled = true
+      shareButton.textContent = "生成中…"
+      try {
+        await copyShareCard(
+          text,
+          currentSettings!,
+          currentShareTemplate!,
+          location.hostname
+        )
+        shareButton.textContent = "已复制"
+      } catch {
+        shareButton.disabled = false
+        shareButton.textContent = "重试分享"
+      }
+    })
+    shadow
+      .querySelector("[data-close]")
+      ?.addEventListener("click", clearShareAction)
+  }
+
+  const run = async (action: SelectionAssistantAction) => {
+    renderResult(action)
+    try {
+      const response = (await chrome.runtime.sendMessage({
+        type: "easy-read:assist-selection",
+        action,
+        selectedText: text,
+        context,
+        pageLanguage: document.documentElement.lang || navigator.language
+      })) as {
+        ok: boolean
+        result?: SelectionAssistantResult
+        error?: string
+      }
+      if (!response.ok || !response.result)
+        throw new Error(response.error ?? "阅读助手没有返回结果")
+      renderResult(action, response.result)
+    } catch (error) {
+      renderResult(
+        action,
+        undefined,
+        error instanceof Error ? error.message : "处理失败，请重试"
+      )
+    }
+  }
+
+  shadow
+    .querySelectorAll<HTMLButtonElement>("[data-action]")
+    .forEach((button) => {
+      button.addEventListener("pointerdown", (event) => event.preventDefault())
+      button.addEventListener(
+        "click",
+        () => void run(button.dataset.action as SelectionAssistantAction)
+      )
+    })
   document.documentElement.appendChild(host)
 }
 
@@ -439,17 +548,18 @@ document.addEventListener("mouseup", (event) => {
       .some((node) => node === document.getElementById(SHARE_HOST_ID))
   )
     return
-  window.setTimeout(showShareAction)
+  window.setTimeout(showSelectionActions)
 })
 document.addEventListener("keyup", (event) => {
   if (event.key === "Shift" || event.key.startsWith("Arrow")) {
-    window.setTimeout(showShareAction)
+    window.setTimeout(showSelectionActions)
   }
 })
 document.addEventListener(
   "scroll",
   () => {
-    clearShareAction()
+    const host = document.getElementById(SHARE_HOST_ID)
+    if (host?.dataset.pinned !== "true") clearShareAction()
   },
   { passive: true }
 )
