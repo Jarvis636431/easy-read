@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <body class="documentation-page">
+    <header id="docs-header">Acme SDK 文档</header>
+    <nav id="docs-navigation" aria-label="文档目录">
+      <a href="#install">安装</a>
+      <a href="#configure">配置</a>
+      <a href="#request">发送请求</a>
+      <a href="#errors">错误处理</a>
+    </nav>
+    <main id="documentation-content" class="docs-content">
+      <h1>快速开始</h1>
+      <section id="install">
+        <h2>安装</h2>
+        <p>使用包管理器安装客户端，然后在应用入口初始化实例。</p>
+        <pre><code>npm install @acme/client</code></pre>
+        <pre><code>import { Client } from "@acme/client"</code></pre>
+      </section>
+      <section id="configure">
+        <h2>配置</h2>
+        <p>客户端接受服务地址、超时时间和重试次数等选项。</p>
+        <pre><code>const client = new Client(options)</code></pre>
+        <pre><code>client.setTimeout(5000)</code></pre>
+      </section>
+      <section id="request">
+        <h2>发送请求</h2>
+        <p>所有请求方法都会返回 Promise，并在失败时抛出结构化错误。</p>
+        <pre><code>await client.get("/items")</code></pre>
+        <pre><code>await client.post("/items", payload)</code></pre>
+      </section>
+      <section id="errors">
+        <h2>错误处理</h2>
+        <pre><code>try { await request() } catch (error) {}</code></pre>
+      </section>
+    </main>
+    <aside id="version-sidebar">当前版本：2.4</aside>
+    <footer id="docs-footer">上一页 · 下一页</footer>
+  </body>
+</html>
