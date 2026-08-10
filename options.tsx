@@ -33,76 +33,20 @@ import {
   type SiteLayoutRule,
   type UrlRule
 } from "~lib/settings"
-
-const layoutRegions: Array<{ id: LayoutRegion; label: string }> = [
-  { id: "header", label: "页头" },
-  { id: "navigation", label: "导航" },
-  { id: "content", label: "主要内容" },
-  { id: "sidebar", label: "侧栏" },
-  { id: "comments", label: "评论" },
-  { id: "footer", label: "页脚" }
-]
-
-function createEmptyLayout(): SiteLayoutRule {
-  const now = Date.now()
-  return {
-    source: "manual",
-    status: "draft",
-    pageType: "conservative",
-    templateId: "preserve",
-    regions: {},
-    hiddenRegions: [],
-    collapsedRegions: [],
-    confidence: 0,
-    createdAt: now,
-    updatedAt: now
-  }
-}
-
-function createTheme(source: ReadingTheme = builtinThemes[1]): ReadingTheme {
-  return {
-    id: crypto.randomUUID(),
-    name: `${source.name}副本`,
-    builtin: false,
-    settings: { ...source.settings, mode: "comfortable" }
-  }
-}
-
-function createRule(themeId: string): UrlRule {
-  return {
-    id: crypto.randomUUID(),
-    name: "新网站规则",
-    pattern: "*.example.com/*",
-    enabled: true,
-    themeId,
-    customHideSelectors: ""
-  }
-}
-
-function createProvider(type: LlmProviderType): LlmProvider {
-  return {
-    id: crypto.randomUUID(),
-    name: type === "anthropic" ? "Anthropic" : "OpenAI compatible",
-    type,
-    baseUrl:
-      type === "anthropic"
-        ? "https://api.anthropic.com"
-        : "https://api.openai.com/v1",
-    model: "",
-    apiKey: ""
-  }
-}
-
-function createShareTemplate(
-  source: ShareCardTemplate = builtinShareTemplates[0]
-): ShareCardTemplate {
-  return {
-    ...source,
-    id: crypto.randomUUID(),
-    name: `${source.name}副本`,
-    builtin: false
-  }
-}
+import {
+  CheckField,
+  ColorField,
+  NumberField,
+  TextField
+} from "~options/components/fields"
+import {
+  createEmptyLayout,
+  createProvider,
+  createRule,
+  createShareTemplate,
+  createTheme,
+  layoutRegions
+} from "~options/model"
 
 function OptionsPage() {
   const [themes, setThemes] = useState<ReadingTheme[]>(builtinThemes)
@@ -364,7 +308,7 @@ function OptionsPage() {
       }
 
   return (
-    <main className="options-shell">
+    <main className="options-shell font-utility text-ink">
       <header className="options-header">
         <div>
           <p className="options-eyebrow">EASY READ / WORKSHOP</p>
@@ -1186,103 +1130,6 @@ function OptionsPage() {
         已保存，打开的网页将自动更新
       </div>
     </main>
-  )
-}
-
-function ColorField({
-  label,
-  value,
-  onChange
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <label className="color-field">
-      <span>{label}</span>
-      <div>
-        <input
-          type="color"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <code>{value.toUpperCase()}</code>
-      </div>
-    </label>
-  )
-}
-
-function NumberField({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  suffix = "",
-  onChange
-}: {
-  label: string
-  value: number
-  min: number
-  max: number
-  step?: number
-  suffix?: string
-  onChange: (value: number) => void
-}) {
-  return (
-    <label>
-      <span>{label}</span>
-      <div className="number-input">
-        <input
-          type="number"
-          value={value}
-          min={min}
-          max={max}
-          step={step}
-          onChange={(event) => onChange(Number(event.target.value))}
-        />
-        {suffix && <b>{suffix}</b>}
-      </div>
-    </label>
-  )
-}
-
-function CheckField({
-  label,
-  checked,
-  onChange
-}: {
-  label: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-}) {
-  return (
-    <label>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />{" "}
-      {label}
-    </label>
-  )
-}
-
-function TextField({
-  label,
-  value,
-  onChange
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <label>
-      <span>{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
   )
 }
 
