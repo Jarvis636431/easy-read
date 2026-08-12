@@ -1,11 +1,11 @@
-import type { DomSummary } from "~lib/layout"
+import type { DomSummary } from "~features/layouts/analyzer"
 import type {
   LayoutRegion,
   LayoutTemplateId,
   LlmProvider,
   PageType,
   SiteLayoutRule
-} from "~lib/settings"
+} from "~shared/storage/repository"
 
 const PAGE_TYPES: PageType[] = [
   "article",

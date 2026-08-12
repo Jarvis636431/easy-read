@@ -3,7 +3,10 @@ import {
   type LayoutRegion,
   type PageType,
   type SiteLayoutRule
-} from "~lib/settings"
+} from "~shared/storage/repository"
+import type { DomSummary, DomSummaryNode } from "~shared/types/layout"
+
+export type { DomSummary, DomSummaryNode } from "~shared/types/layout"
 
 const REGION_HINTS: Record<LayoutRegion, string[]> = {
   header: ["header", "masthead", "topbar", "top-bar"],
@@ -19,26 +22,6 @@ export type LayoutHealth = {
   score: number
   matchedRegions: number
   missingRegions: LayoutRegion[]
-}
-
-export type DomSummaryNode = {
-  selector: string
-  tag: string
-  role?: string
-  landmark?: string
-  zone: "top" | "middle" | "bottom"
-  widthRatio: number
-  textLength: number
-  paragraphs: number
-  headings: number
-  links: number
-}
-
-export type DomSummary = {
-  url: string
-  viewport: { width: number; height: number }
-  documentHeight: number
-  nodes: DomSummaryNode[]
 }
 
 function elementName(element: Element) {

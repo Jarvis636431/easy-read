@@ -1,14 +1,38 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import {
-  analyzeDocument,
-  checkLayoutHealth,
-  createDomSummary
-} from "~lib/layout"
+  LAYOUT_ATTRIBUTE,
+  LAYOUT_SHELL_ID,
+  REGION_ATTRIBUTE,
+  REGION_COLORS,
+  REGION_LABELS,
+  ROOT_CLASS,
+  STYLE_ID,
+  TEMPLATED_CLASS,
+  VISIBILITY_ATTRIBUTE
+} from "~contents/layout-runtime"
+import {
+  clearPreviewUi,
+  PREVIEW_CLASS,
+  PREVIEW_HOST_ID,
+  PREVIEW_STYLE_ID
+} from "~contents/preview-dialog"
+import {
+  selectionContext,
+  selectionIsEditable,
+  selectionRect
+} from "~contents/selection-assistant"
 import type {
   SelectionAssistantAction,
   SelectionAssistantResult
-} from "~lib/llm"
+} from "~features/ai/client"
+import {
+  analyzeDocument,
+  checkLayoutHealth,
+  createDomSummary
+} from "~features/layouts/analyzer"
+import { copyShareCard } from "~features/sharing/share-card"
+import { sendRuntimeRequest } from "~shared/messaging/client"
 import {
   ACTIVE_SHARE_TEMPLATE_STORAGE_KEY,
   builtinLayoutTemplates,
@@ -31,48 +55,19 @@ import {
   type ShareCardTemplate,
   type SiteLayoutRule,
   type UrlRule
-} from "~lib/settings"
-import { copyShareCard } from "~lib/share-card"
+} from "~shared/storage/repository"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   run_at: "document_start"
 }
 
-const STYLE_ID = "easy-read-page-styles"
-const ROOT_CLASS = "easy-read-active"
-const REGION_ATTRIBUTE = "data-easy-read-region"
-const VISIBILITY_ATTRIBUTE = "data-easy-read-visibility"
-const LAYOUT_ATTRIBUTE = "data-easy-read-layout"
-const LAYOUT_SHELL_ID = "easy-read-layout-shell"
-const TEMPLATED_CLASS = "easy-read-templated"
-const PREVIEW_HOST_ID = "easy-read-layout-preview"
-const PREVIEW_STYLE_ID = "easy-read-layout-preview-styles"
-const PREVIEW_CLASS = "easy-read-layout-previewing"
 const SHARE_HOST_ID = "easy-read-share-selection"
 
 let currentSettings: EasyReadSettings | null = null
 let currentShareTemplate: ShareCardTemplate | null = null
 let sharingEnabled = false
 let movedLayoutNodes: Array<{ node: Element; placeholder: Comment }> = []
-
-const REGION_LABELS: Record<LayoutRegion, string> = {
-  header: "页头",
-  navigation: "导航",
-  content: "正文",
-  sidebar: "侧栏",
-  comments: "评论",
-  footer: "页脚"
-}
-
-const REGION_COLORS: Record<LayoutRegion, string> = {
-  header: "#547a91",
-  navigation: "#805da3",
-  content: "#168678",
-  sidebar: "#c27632",
-  comments: "#a34f6f",
-  footer: "#657078"
-}
 
 const AD_SELECTORS = [
   "ins.adsbygoogle",
@@ -269,12 +264,6 @@ function mountLayoutTemplate(rule: SiteLayoutRule) {
   document.documentElement.classList.add(TEMPLATED_CLASS)
 }
 
-function clearPreviewUi() {
-  document.getElementById(PREVIEW_HOST_ID)?.remove()
-  document.getElementById(PREVIEW_STYLE_ID)?.remove()
-  document.documentElement.classList.remove(PREVIEW_CLASS)
-}
-
 function applyLayoutRule(rule = analyzeDocument()) {
   clearLayoutMarkers()
   const health = checkLayoutHealth(rule)
@@ -363,35 +352,6 @@ async function refreshSettings() {
 
 function clearShareAction() {
   document.getElementById(SHARE_HOST_ID)?.remove()
-}
-
-function selectionRect(selection: Selection) {
-  if (!selection.rangeCount) return null
-  const range = selection.getRangeAt(0)
-  const rect = range.getBoundingClientRect()
-  if (rect.width || rect.height) return rect
-  return range.getClientRects()[0] ?? null
-}
-
-function selectionIsEditable(selection: Selection) {
-  const node = selection.anchorNode
-  const element =
-    node instanceof Element ? node : node?.parentElement ?? undefined
-  return Boolean(element?.closest("input, textarea, [contenteditable='true']"))
-}
-
-function selectionContext(selection: Selection) {
-  if (!selection.rangeCount) return ""
-  const ancestor = selection.getRangeAt(0).commonAncestorContainer
-  const element =
-    ancestor instanceof Element ? ancestor : ancestor.parentElement
-  const container = element?.closest(
-    "p, li, blockquote, article, section, main, [role='main']"
-  )
-  return (container?.textContent ?? "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 1800)
 }
 
 function assistantCardStyles(settings: EasyReadSettings) {
@@ -506,19 +466,15 @@ function showSelectionActions() {
   const run = async (action: SelectionAssistantAction) => {
     renderResult(action)
     try {
-      const response = (await chrome.runtime.sendMessage({
+      const response = await sendRuntimeRequest({
         type: "easy-read:assist-selection",
         action,
         selectedText: text,
         context,
         pageLanguage: document.documentElement.lang || navigator.language
-      })) as {
-        ok: boolean
-        result?: SelectionAssistantResult
-        error?: string
-      }
-      if (!response.ok || !response.result)
-        throw new Error(response.error ?? "阅读助手没有返回结果")
+      })
+      if ("error" in response) throw new Error(response.error)
+      if (!("result" in response)) throw new Error("阅读助手没有返回结果")
       renderResult(action, response.result)
     } catch (error) {
       renderResult(

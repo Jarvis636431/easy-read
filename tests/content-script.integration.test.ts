@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
   EXTENSION_ENABLED_STORAGE_KEY,
+  presets,
   RULES_STORAGE_KEY,
   STORAGE_KEY,
-  presets,
   type SiteLayoutRule
-} from "~/lib/settings"
+} from "~/shared/storage/repository"
+
 import { installVisibleLayout, loadFixture } from "./helpers/dom"
 
 type MessageListener = (
@@ -126,9 +127,9 @@ describe("内容脚本集成", () => {
     await import("~/contents/easy-read")
 
     await vi.waitFor(() => {
-      expect(document.documentElement.classList.contains("easy-read-active")).toBe(
-        true
-      )
+      expect(
+        document.documentElement.classList.contains("easy-read-active")
+      ).toBe(true)
     })
     expect(chromeMock.messageListeners).toHaveLength(1)
     expect(document.getElementById("easy-read-page-styles")).not.toBeNull()
@@ -204,9 +205,9 @@ describe("内容脚本集成", () => {
     await vi.waitFor(() => {
       expect(document.getElementById("easy-read-layout-shell")).toBeNull()
     })
-    expect(document.documentElement.classList.contains("easy-read-active")).toBe(
-      false
-    )
+    expect(
+      document.documentElement.classList.contains("easy-read-active")
+    ).toBe(false)
     expect(document.getElementById("easy-read-page-styles")).toBeNull()
     expect(document.querySelector(".page-grid #story-content")).not.toBeNull()
     expect(document.getElementById("reader-comments")?.parentElement).toBe(

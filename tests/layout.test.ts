@@ -5,14 +5,10 @@ import {
   checkLayoutHealth,
   createDomSummary,
   selectorFor
-} from "~/lib/layout"
-import type { SiteLayoutRule } from "~/lib/settings"
+} from "~/features/layouts/analyzer"
+import type { SiteLayoutRule } from "~/shared/storage/repository"
 
-function visibleRect(
-  top = 0,
-  width = 900,
-  height = 300
-): DOMRect {
+function visibleRect(top = 0, width = 900, height = 300): DOMRect {
   return {
     x: 0,
     y: top,

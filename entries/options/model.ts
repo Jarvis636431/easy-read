@@ -8,7 +8,7 @@ import {
   type ShareCardTemplate,
   type SiteLayoutRule,
   type UrlRule
-} from "~lib/settings"
+} from "~shared/storage/repository"
 
 export const layoutRegions: Array<{ id: LayoutRegion; label: string }> = [
   { id: "header", label: "页头" },

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest"
 
-import { analyzeDocument, checkLayoutHealth } from "~/lib/layout"
+import { analyzeDocument, checkLayoutHealth } from "~/features/layouts/analyzer"
+
 import { installVisibleLayout, loadFixture } from "./helpers/dom"
 
 beforeEach(() => {

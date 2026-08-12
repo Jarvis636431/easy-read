@@ -7,7 +7,7 @@ import {
   presets,
   resolveSettings,
   type UrlRule
-} from "~/lib/settings"
+} from "~/shared/storage/repository"
 
 function rule(overrides: Partial<UrlRule> = {}): UrlRule {
   return {
@@ -44,16 +44,17 @@ describe("URL 规则匹配", () => {
       rule({ id: "second", pattern: "docs.example.com/*" })
     ]
 
-    expect(
-      findMatchingRule("https://docs.example.com/guide", rules)?.id
-    ).toBe("first")
+    expect(findMatchingRule("https://docs.example.com/guide", rules)?.id).toBe(
+      "first"
+    )
   })
 
   it("命中规则时应用主题，主题不存在时保留全局设置", () => {
     const url = "https://docs.example.com/guide"
 
-    expect(resolveSettings(url, presets.comfortable, [rule()], builtinThemes))
-      .toEqual(presets.night)
+    expect(
+      resolveSettings(url, presets.comfortable, [rule()], builtinThemes)
+    ).toEqual(presets.night)
     expect(
       resolveSettings(
         url,

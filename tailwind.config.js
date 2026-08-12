@@ -1,6 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./options.tsx", "./options/**/*.{ts,tsx}"],
+  content: [
+    "./entries/**/*.{ts,tsx}",
+    "./shared/components/**/*.{ts,tsx}",
+    "./options.tsx",
+    "./popup.tsx"
+  ],
   corePlugins: {
     preflight: false
   },

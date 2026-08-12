@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   analyzeLayoutWithLlm,
   interpretReadingCommand
-} from "~/lib/llm"
-import type { DomSummary } from "~/lib/layout"
-import type { LlmProvider } from "~/lib/settings"
+} from "~/features/ai/client"
+import type { DomSummary } from "~/features/layouts/analyzer"
+import type { LlmProvider } from "~/shared/storage/repository"
 
 const provider: LlmProvider = {
   id: "test",

@@ -1,4 +1,7 @@
-import type { EasyReadSettings, ShareCardTemplate } from "~lib/settings"
+import type {
+  EasyReadSettings,
+  ShareCardTemplate
+} from "~shared/storage/repository"
 
 const CARD_WIDTH = 1080
 const HORIZONTAL_PADDING = 96
